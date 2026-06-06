@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -77,34 +78,42 @@ export enum Tab {
 
 interface DashboardLayoutProps {
   onLogout: () => void;
-  initialTab?: string;
   userRole: UserRole;
 }
 
-const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, initialTab, userRole }) => {
+// Slug helpers — the active tab lives in the URL (/dashboard/:slug).
+const tabToSlug = (tab: string) => (tab === Tab.DASHBOARD ? '' : tab.toLowerCase().replace(/\s+/g, '-'));
+
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole }) => {
   const { pawPoints } = usePawData();
-  const [activeTab, setActiveTab] = useState<string>(initialTab || Tab.DASHBOARD);
-  
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Map URL slug -> Tab (e.g. /dashboard/health -> Tab.HEALTH, /dashboard -> overview).
+  const slugToTab = useMemo(
+    () => Object.fromEntries(Object.values(Tab).map((t) => [tabToSlug(t), t])) as Record<string, Tab>,
+    [],
+  );
+  const currentSlug = location.pathname.replace(/^\/dashboard\/?/, '');
+  const activeTab: string = slugToTab[currentSlug] || Tab.DASHBOARD;
+
+  const goTab = (tab: string) => navigate(`/dashboard/${tabToSlug(tab)}`);
+
   // Responsive Sidebar States
   const [isDesktopExpanded, setIsDesktopExpanded] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  
+
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [navigationContext, setNavigationContext] = useState<any>(null);
 
-  useEffect(() => {
-    if (initialTab) {
-        setActiveTab(initialTab);
-    }
-  }, [initialTab]);
-
+  // Close the mobile drawer whenever the route (tab) changes.
   useEffect(() => {
       setIsMobileOpen(false);
-  }, [activeTab]);
+  }, [location.pathname]);
 
   const handleInternalNavigate = (tab: string, context?: any) => {
-      setActiveTab(tab);
       if (context) setNavigationContext(context);
+      goTab(tab);
   };
 
   // Define Sidebar Items based on Role
@@ -173,7 +182,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, initialTab,
     if (activeTab === Tab.MESSAGES) return <Messages initialContext={navigationContext} />;
     if (activeTab === Tab.PETS) return <PetProfileManager />;
     if (activeTab === Tab.HEALTH) return <HealthHub />;
-    if (activeTab === Tab.PAWSCAN) return <PawScan onBookVet={() => setActiveTab(Tab.APPOINTMENTS)} />;
+    if (activeTab === Tab.PAWSCAN) return <PawScan onBookVet={() => goTab(Tab.APPOINTMENTS)} />;
     if (activeTab === Tab.APPOINTMENTS) return <BookingCenter />;
     if (activeTab === Tab.SAFETY) return <SafetyCenter />;
     if (activeTab === Tab.REWARDS) return <RewardsCenter />;
@@ -257,7 +266,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, initialTab,
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => goTab(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative ${
                   isActive 
                     ? 'bg-slate-900 text-white shadow-md' 
@@ -284,7 +293,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, initialTab,
         <div className="p-3 border-t border-slate-100">
            {userRole === UserRole.OWNER && (
                <button
-                   onClick={() => setActiveTab(Tab.REWARDS)}
+                   onClick={() => goTab(Tab.REWARDS)}
                    className={`w-full text-left mb-4 p-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl text-white shadow-lg relative overflow-hidden group cursor-pointer transition-all ${!isDesktopExpanded ? 'lg:hidden' : ''}`}
                >
                    <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -371,7 +380,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, initialTab,
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => goTab(item.id)}
                   className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? 'text-primary-600' : 'text-slate-400'}`}
                 >
                   <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />

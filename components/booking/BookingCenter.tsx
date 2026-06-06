@@ -28,7 +28,7 @@ const BookingCenter: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <header>
-        <h1 className="text-3xl font-display font-semibold text-slate-800">Appointments</h1>
+        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-slate-800">Appointments</h1>
         <p className="text-slate-500 mt-1">Book vets, groomers, sitters — in person or via telehealth.</p>
       </header>
 

@@ -5,7 +5,7 @@ import { Card, Button, Badge, Avatar, Modal, Input, useToast } from '../ui';
 import { usePawData } from '../../contexts/PawDataContext';
 import { Pet } from '../../types';
 
-const tagUrl = (petId: string) => `${window.location.origin}/#/tag/${petId}`;
+const tagUrl = (petId: string) => `${window.location.origin}/tag/${petId}`;
 
 const SafetyCenter: React.FC = () => {
   const { myPets, safety, foundReports, markLost, markSafe } = usePawData();
@@ -32,7 +32,7 @@ const SafetyCenter: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <header>
-        <h1 className="text-3xl font-display font-semibold text-slate-800">Safety & PawTag</h1>
+        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-slate-800">Safety & PawTag</h1>
         <p className="text-slate-500 mt-1">Scan-to-return tags and lost-pet alerts that rally the community.</p>
       </header>
 

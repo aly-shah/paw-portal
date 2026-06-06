@@ -1,55 +1,15 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Heart, Shield, Users, ShoppingBag, ArrowRight, Star, CheckCircle, Calendar, Phone, Mail, Instagram, Facebook, Twitter, MapPin, Clock, Zap, Award, Globe, Sparkles } from 'lucide-react';
+import MarketingShell from './marketing/MarketingShell';
 
-interface LandingPageProps {
-  onLogin: () => void;
-  onSignup: () => void;
-  onQuickNav: (destination: 'Services' | 'Marketplace' | 'Community') => void;
-  onAdminLogin: () => void;
-}
-
-const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onSignup, onQuickNav, onAdminLogin }) => {
+const LandingPage: React.FC = () => {
+  const nav = useNavigate();
+  const onSignup = () => nav('/signup');
+  const onQuickNav = (_destination: 'Services' | 'Marketplace' | 'Community') => nav('/signup');
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden selection:bg-teal-200 selection:text-teal-900">
-      
-      {/* Animated Background Mesh */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-teal-200 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob"></div>
-          <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-purple-200 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-2000"></div>
-          <div className="absolute -bottom-32 left-1/3 w-[500px] h-[500px] bg-rose-200 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-4000"></div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="sticky top-4 z-50 max-w-7xl mx-auto px-4 md:px-6">
-        <div className="bg-white/70 backdrop-blur-xl border border-white/40 rounded-full px-6 h-16 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo(0, 0)}>
-            <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-teal-200/50">
-              <Heart className="text-white w-4 h-4 fill-current" />
-            </div>
-            <span className="text-xl font-black text-slate-800 tracking-tight">PawPortal</span>
-          </div>
-          <div className="hidden md:flex items-center gap-8 font-bold text-sm text-slate-500">
-            <a href="#features" className="hover:text-teal-600 transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-teal-600 transition-colors">How it Works</a>
-            <a href="#community" className="hover:text-teal-600 transition-colors">Community</a>
-          </div>
-          <div className="flex gap-3">
-            <button 
-              onClick={onLogin}
-              className="text-slate-700 font-bold hover:text-teal-600 transition-colors px-3 text-sm"
-            >
-              Log In
-            </button>
-            <button 
-              onClick={onSignup}
-              className="bg-slate-900 text-white px-5 py-2 rounded-full font-bold text-sm hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-            >
-              Sign Up
-            </button>
-          </div>
-        </div>
-      </nav>
+    <MarketingShell>
 
       {/* Hero Section */}
       <header className="relative pt-20 pb-32 md:pt-32 md:pb-48">
@@ -206,67 +166,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onSignup, onQuickNav
          </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-white pt-20 pb-10">
-         <div className="max-w-7xl mx-auto px-6">
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-                 <div className="col-span-1 md:col-span-1">
-                     <div className="flex items-center gap-2 mb-6">
-                        <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                            <Heart className="text-white w-4 h-4 fill-current" />
-                        </div>
-                        <span className="text-xl font-black text-slate-900">PawPortal</span>
-                     </div>
-                     <p className="text-slate-500 text-sm leading-relaxed mb-6 font-medium">
-                         Making pet ownership easier, one paw at a time. Connect, shop, and care with the world's most trusted pet platform.
-                     </p>
-                     <div className="flex gap-4">
-                         {[Instagram, Twitter, Facebook].map((Icon, i) => (
-                             <a key={i} href="#" className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-900 hover:text-white transition-all">
-                                 <Icon size={18} />
-                             </a>
-                         ))}
-                     </div>
-                 </div>
-                 <div>
-                     <h4 className="font-bold text-slate-900 mb-6">Services</h4>
-                     <ul className="space-y-4 text-sm text-slate-500 font-medium">
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">Veterinary Care</a></li>
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">Dog Walking</a></li>
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">Pet Grooming</a></li>
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">Pet Insurance</a></li>
-                     </ul>
-                 </div>
-                 <div>
-                     <h4 className="font-bold text-slate-900 mb-6">Company</h4>
-                     <ul className="space-y-4 text-sm text-slate-500 font-medium">
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">About Us</a></li>
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">Careers</a></li>
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">Blog</a></li>
-                         <li><a href="#" className="hover:text-teal-600 transition-colors">Contact</a></li>
-                     </ul>
-                 </div>
-                 <div>
-                     <h4 className="font-bold text-slate-900 mb-6">Contact</h4>
-                     <ul className="space-y-4 text-sm text-slate-500 font-medium">
-                         <li className="flex items-center gap-3"><Mail size={16} /> support@pawportal.com</li>
-                         <li className="flex items-center gap-3"><Phone size={16} /> +1 (555) 123-4567</li>
-                         <li className="flex items-center gap-3"><MapPin size={16} /> 123 Puppy Lane, SF, CA</li>
-                     </ul>
-                 </div>
-             </div>
-             
-             <div className="border-t border-slate-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400 font-bold uppercase tracking-wider">
-                 <p>&copy; 2024 PawPortal Inc. All rights reserved.</p>
-                 <div className="flex gap-8">
-                     <a href="#" className="hover:text-slate-600">Privacy Policy</a>
-                     <a href="#" className="hover:text-slate-600">Terms of Service</a>
-                     <button onClick={onAdminLogin} className="hover:text-slate-600">Admin Portal</button>
-                 </div>
-             </div>
-         </div>
-      </footer>
-    </div>
+    </MarketingShell>
   );
 };
 

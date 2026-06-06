@@ -31,7 +31,7 @@ const RewardsCenter: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <header>
-        <h1 className="text-3xl font-display font-semibold text-slate-800">Paw Points</h1>
+        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-slate-800">Paw Points</h1>
         <p className="text-slate-500 mt-1">Earn points for walks, checkups & care — redeem for real perks.</p>
       </header>
 

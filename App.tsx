@@ -1,115 +1,104 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import {
+  BrowserRouter, Routes, Route, Navigate,
+  useNavigate, useParams, useSearchParams,
+} from 'react-router-dom';
 import DashboardLayout from './components/DashboardLayout';
 import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPage';
 import AdminLogin from './components/admin/AdminLogin';
 import SuperAdminDashboard from './components/admin/SuperAdminDashboard';
 import PawTagPage from './components/safety/PawTagPage';
+import FeaturesPage from './components/marketing/FeaturesPage';
+import HowItWorksPage from './components/marketing/HowItWorksPage';
+import CommunityPage from './components/marketing/CommunityPage';
 import { UserRole } from './types';
 
-type ViewState = 'landing' | 'login' | 'signup' | 'dashboard' | 'admin-login';
+const AUTH_KEY = 'pawportal-auth';
 
-// Public PawTag deep-link, e.g. #/tag/p1 (reached by scanning a pet's QR code).
-const readTagId = () => {
-  const m = window.location.hash.match(/^#\/tag\/([\w-]+)/);
-  return m ? m[1] : null;
+const loadRole = (): UserRole | null => {
+  try {
+    const r = localStorage.getItem(AUTH_KEY);
+    return r ? (r as UserRole) : null;
+  } catch {
+    return null;
+  }
+};
+
+// --- Route wrappers (each gets access to navigate) ---
+
+const AuthRoute: React.FC<{ mode: 'login' | 'signup'; onLogin: (r: UserRole) => void }> = ({ mode, onLogin }) => {
+  const nav = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get('next');
+  return (
+    <AuthPage
+      initialView={mode}
+      onLoginSuccess={(role: UserRole) => {
+        onLogin(role);
+        nav(role === UserRole.SUPER_ADMIN ? '/dashboard' : `/dashboard/${next || ''}`);
+      }}
+      onBack={() => nav('/')}
+    />
+  );
+};
+
+const AdminRoute: React.FC<{ onLogin: (r: UserRole) => void }> = ({ onLogin }) => {
+  const nav = useNavigate();
+  return (
+    <AdminLogin
+      onLoginSuccess={(role: UserRole) => {
+        onLogin(role);
+        nav('/dashboard');
+      }}
+      onBack={() => nav('/')}
+    />
+  );
+};
+
+const TagRoute: React.FC = () => {
+  const { petId } = useParams();
+  return <PawTagPage petId={petId || ''} />;
+};
+
+const ProtectedDashboard: React.FC<{ role: UserRole | null; onLogout: () => void }> = ({ role, onLogout }) => {
+  const nav = useNavigate();
+  const handleLogout = () => {
+    onLogout();
+    nav('/');
+  };
+  if (!role) return <Navigate to="/login" replace />;
+  if (role === UserRole.SUPER_ADMIN) return <SuperAdminDashboard onLogout={handleLogout} />;
+  return <DashboardLayout userRole={role} onLogout={handleLogout} />;
 };
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewState>('landing');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>(UserRole.OWNER);
+  const [role, setRole] = useState<UserRole | null>(() => loadRole());
 
-  // Public, unauthenticated PawTag route — independent of auth state.
-  const [tagId, setTagId] = useState<string | null>(readTagId());
-  useEffect(() => {
-    const onHash = () => setTagId(readTagId());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
-
-  // State to handle deep linking to specific dashboard tabs
-  const [initialDashboardTab, setInitialDashboardTab] = useState<string | undefined>(undefined);
-
-  const handleLoginSuccess = (role: UserRole) => {
-    setUserRole(role);
-    setIsAuthenticated(true);
-    setCurrentView('dashboard');
+  const login = (r: UserRole) => {
+    setRole(r);
+    try { localStorage.setItem(AUTH_KEY, r); } catch { /* ignore */ }
+  };
+  const logout = () => {
+    setRole(null);
+    try { localStorage.removeItem(AUTH_KEY); } catch { /* ignore */ }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentView('landing');
-    setInitialDashboardTab(undefined);
-    setUserRole(UserRole.OWNER); // Reset to default
-  };
-
-  // Quick Nav Handler (e.g., clicking "Find a Vet" on landing page)
-  const handleQuickNav = (destination: 'Services' | 'Marketplace' | 'Community') => {
-    setInitialDashboardTab(destination);
-    // Assume we need to signup/login first to access these features
-    setCurrentView('signup');
-  };
-
-  // Public PawTag page (scan-to-return) — takes precedence over everything.
-  if (tagId) {
-    return <PawTagPage petId={tagId} />;
-  }
-
-  // Super Admin Direct Render
-  if (isAuthenticated && userRole === UserRole.SUPER_ADMIN) {
-      return <SuperAdminDashboard onLogout={handleLogout} />;
-  }
-
-  // Main Router Logic
-  if (isAuthenticated && currentView === 'dashboard') {
-    return (
-      <DashboardLayout 
-        onLogout={handleLogout} 
-        initialTab={initialDashboardTab}
-        userRole={userRole}
-      />
-    );
-  }
-
-  if (currentView === 'admin-login') {
-      return (
-          <AdminLogin 
-            onLoginSuccess={handleLoginSuccess}
-            onBack={() => setCurrentView('landing')}
-          />
-      );
-  }
-
-  if (currentView === 'login') {
-    return (
-      <AuthPage 
-        initialView="login" 
-        onLoginSuccess={handleLoginSuccess} 
-        onBack={() => setCurrentView('landing')} 
-      />
-    );
-  }
-
-  if (currentView === 'signup') {
-    return (
-      <AuthPage 
-        initialView="signup" 
-        onLoginSuccess={handleLoginSuccess} 
-        onBack={() => setCurrentView('landing')} 
-      />
-    );
-  }
-
-  // Default to Landing Page
   return (
-    <LandingPage 
-      onLogin={() => setCurrentView('login')} 
-      onSignup={() => setCurrentView('signup')}
-      onQuickNav={handleQuickNav}
-      onAdminLogin={() => setCurrentView('admin-login')}
-    />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={role ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/how-it-works" element={<HowItWorksPage />} />
+        <Route path="/community" element={<CommunityPage />} />
+        <Route path="/login" element={<AuthRoute mode="login" onLogin={login} />} />
+        <Route path="/signup" element={<AuthRoute mode="signup" onLogin={login} />} />
+        <Route path="/admin" element={<AdminRoute onLogin={login} />} />
+        <Route path="/tag/:petId" element={<TagRoute />} />
+        <Route path="/dashboard/*" element={<ProtectedDashboard role={role} onLogout={logout} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
 

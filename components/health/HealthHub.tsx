@@ -61,7 +61,7 @@ const HealthHub: React.FC = () => {
     <div className="max-w-6xl mx-auto space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-semibold text-slate-800">Health Hub</h1>
+          <h1 className="text-2xl sm:text-3xl font-display font-semibold text-slate-800">Health Hub</h1>
           <p className="text-slate-500 mt-1">Timeline, reminders, and AI care plans for your pets.</p>
         </div>
         <div className="flex gap-2 flex-wrap">

@@ -71,7 +71,7 @@ const PawScan: React.FC<PawScanProps> = ({ onBookVet }) => {
         <div className="flex items-center gap-2 text-secondary-600 font-bold text-xs uppercase tracking-wider mb-1">
           <Sparkles size={14} /> AI-Powered
         </div>
-        <h1 className="text-3xl font-display font-semibold text-slate-800">PawScan</h1>
+        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-slate-800">PawScan</h1>
         <p className="text-slate-500 mt-1">
           Snap a photo of a concern — a rash, a limp, an eye — and get an instant AI visual triage.
         </p>
