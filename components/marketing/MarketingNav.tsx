@@ -1,77 +1,85 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Heart, Menu, X } from 'lucide-react';
+import { ArrowUpRight, Menu, X, PawPrint } from 'lucide-react';
 
 const links = [
   { to: '/features', label: 'Features' },
-  { to: '/how-it-works', label: 'How it Works' },
+  { to: '/how-it-works', label: 'How it works' },
   { to: '/community', label: 'Community' },
 ];
 
+const Wordmark: React.FC = () => (
+  <Link to="/" aria-label="PawPortal home" className="inline-flex items-center gap-2">
+    <span className="inline-flex size-8 items-center justify-center rounded-lg bg-[var(--ed-accent)] text-[var(--ed-bg)]">
+      <PawPrint className="size-4" strokeWidth={2} />
+    </span>
+    <span className="text-[19px] tracking-tight text-[var(--ed-ink)]" style={{ fontWeight: 600 }}>PawPortal</span>
+  </Link>
+);
+
 const MarketingNav: React.FC = () => {
   const nav = useNavigate();
+  const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `transition-colors ${isActive ? 'text-teal-600' : 'hover:text-teal-600'}`;
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   return (
-    <nav className="sticky top-4 z-50 max-w-7xl mx-auto px-4 md:px-6">
-      <div className="bg-white/70 backdrop-blur-xl border border-white/40 rounded-full px-6 h-16 flex items-center justify-between shadow-sm">
-        <Link to="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
-          <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-teal-200/50">
-            <Heart className="text-white w-4 h-4 fill-current" />
-          </div>
-          <span className="text-xl font-black text-slate-800 tracking-tight">PawPortal</span>
-        </Link>
+    <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${scrolled ? 'border-b border-[var(--ed-line)] bg-[var(--ed-bg)]/85 backdrop-blur' : 'border-b border-transparent'}`}>
+      <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-6 lg:px-10">
+        <Wordmark />
 
-        <div className="hidden md:flex items-center gap-8 font-bold text-sm text-slate-500">
+        <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
           {links.map((l) => (
-            <NavLink key={l.to} to={l.to} className={linkClass}>{l.label}</NavLink>
+            <NavLink
+              key={l.to}
+              to={l.to}
+              className={({ isActive }) => `text-[13px] transition-colors ${isActive ? 'text-[var(--ed-accent)]' : 'text-[var(--ed-ink-2)] hover:text-[var(--ed-accent)]'}`}
+            >
+              {l.label}
+            </NavLink>
           ))}
+        </nav>
+
+        <div className="hidden items-center gap-2 md:flex">
+          <button onClick={() => nav('/login')} className="text-[13px] text-[var(--ed-ink-2)] hover:text-[var(--ed-accent)] px-2">
+            Log in
+          </button>
+          <button onClick={() => nav('/signup')} className="group inline-flex items-center gap-1.5 rounded-full bg-[var(--ed-ink)] px-4 py-2 text-[13px] text-[var(--ed-bg)] transition-all hover:bg-[var(--ed-accent)]" style={{ fontWeight: 500 }}>
+            Get started
+            <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-px group-hover:translate-x-px" strokeWidth={2} />
+          </button>
         </div>
 
-        <div className="hidden md:flex gap-3">
-          <button onClick={() => nav('/login')} className="text-slate-700 font-bold hover:text-teal-600 transition-colors px-3 text-sm">
-            Log In
-          </button>
-          <button onClick={() => nav('/signup')} className="bg-slate-900 text-white px-5 py-2 rounded-full font-bold text-sm hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
-            Sign Up
-          </button>
-        </div>
-
-        {/* Mobile toggle */}
-        <button className="md:hidden text-slate-700 p-1" onClick={() => setOpen((o) => !o)} aria-label="Toggle menu">
-          {open ? <X size={24} /> : <Menu size={24} />}
+        <button className="md:hidden text-[var(--ed-ink)] p-1" onClick={() => setOpen((o) => !o)} aria-label="Toggle menu">
+          {open ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
 
-      {/* Mobile menu */}
       {open && (
-        <div className="md:hidden mt-2 bg-white/90 backdrop-blur-xl border border-white/60 rounded-3xl shadow-lg p-4 flex flex-col gap-1 animate-fade-in">
+        <div className="md:hidden mx-4 mt-2 rounded-2xl border border-[var(--ed-line)] bg-[var(--ed-surface)] p-3 shadow-xl">
           {links.map((l) => (
             <NavLink
               key={l.to}
               to={l.to}
               onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                `px-4 py-3 rounded-xl font-bold text-sm ${isActive ? 'bg-teal-50 text-teal-600' : 'text-slate-600 hover:bg-slate-50'}`
-              }
+              className={({ isActive }) => `block rounded-xl px-4 py-3 text-[14px] ${isActive ? 'bg-[var(--ed-bg-alt)] text-[var(--ed-accent)]' : 'text-[var(--ed-ink-2)]'}`}
             >
               {l.label}
             </NavLink>
           ))}
-          <div className="flex gap-2 mt-2">
-            <button onClick={() => { setOpen(false); nav('/login'); }} className="flex-1 py-3 rounded-xl border border-slate-200 font-bold text-sm text-slate-700">
-              Log In
-            </button>
-            <button onClick={() => { setOpen(false); nav('/signup'); }} className="flex-1 py-3 rounded-xl bg-slate-900 text-white font-bold text-sm">
-              Sign Up
-            </button>
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => { setOpen(false); nav('/login'); }} className="flex-1 rounded-full border border-[var(--ed-line-strong)] py-3 text-[13px] text-[var(--ed-ink)]">Log in</button>
+            <button onClick={() => { setOpen(false); nav('/signup'); }} className="flex-1 rounded-full bg-[var(--ed-ink)] py-3 text-[13px] text-[var(--ed-bg)]">Get started</button>
           </div>
         </div>
       )}
-    </nav>
+    </header>
   );
 };
 

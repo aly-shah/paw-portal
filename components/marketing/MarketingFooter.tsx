@@ -1,65 +1,76 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, Mail, Phone, MapPin, Instagram, Twitter, Facebook } from 'lucide-react';
+import { PawPrint, ArrowUpRight } from 'lucide-react';
+
+const cols = [
+  {
+    title: 'Product',
+    links: [
+      { label: 'Features', to: '/features' },
+      { label: 'How it works', to: '/how-it-works' },
+      { label: 'Community', to: '/community' },
+      { label: 'Get started', to: '/signup' },
+    ],
+  },
+  {
+    title: 'For',
+    links: [
+      { label: 'Pet owners', to: '/signup' },
+      { label: 'Vets & clinics', to: '/signup' },
+      { label: 'Vendors', to: '/signup' },
+      { label: 'Caregivers', to: '/signup' },
+    ],
+  },
+];
 
 const MarketingFooter: React.FC = () => {
   const nav = useNavigate();
   return (
-    <footer className="bg-white pt-20 pb-10 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-          <div>
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-                <Heart className="text-white w-4 h-4 fill-current" />
-              </div>
-              <span className="text-xl font-black text-slate-900">PawPortal</span>
+    <footer className="relative border-t border-[var(--ed-line)] bg-[var(--ed-bg-alt)]">
+      <div className="grain pointer-events-none absolute inset-0" aria-hidden />
+      <div className="relative mx-auto max-w-[1240px] px-6 py-16 lg:px-10">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-12">
+          <div className="md:col-span-5">
+            <div className="inline-flex items-center gap-2">
+              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-[var(--ed-accent)] text-[var(--ed-bg)]">
+                <PawPrint className="size-4" strokeWidth={2} />
+              </span>
+              <span className="text-[19px] tracking-tight" style={{ fontWeight: 600 }}>PawPortal</span>
             </div>
-            <p className="text-slate-500 text-sm leading-relaxed mb-6 font-medium">
-              Making pet ownership easier, one paw at a time. Connect, shop, and care with the world's most trusted pet platform.
+            <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-[var(--ed-muted)]">
+              The super-app for pets. Vets, groomers, sitters, a marketplace, and a thriving
+              community — everything your pet needs, in one calm place.
             </p>
-            <div className="flex gap-4">
-              {[Instagram, Twitter, Facebook].map((Icon, i) => (
-                <a key={i} href="#" className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-900 hover:text-white transition-all">
-                  <Icon size={18} />
-                </a>
-              ))}
+            <button
+              onClick={() => nav('/signup')}
+              className="group mt-7 inline-flex items-center gap-2 rounded-full bg-[var(--ed-ink)] px-5 py-3 text-[14px] text-[var(--ed-bg)] transition-all hover:bg-[var(--ed-accent)]"
+              style={{ fontWeight: 500 }}
+            >
+              Get started free
+              <ArrowUpRight className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" strokeWidth={2} />
+            </button>
+          </div>
+
+          {cols.map((c) => (
+            <div key={c.title} className="md:col-span-3 md:col-start-auto">
+              <p className="ed-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ed-muted)]">{c.title}</p>
+              <ul className="mt-5 space-y-3">
+                {c.links.map((l) => (
+                  <li key={l.label}>
+                    <Link to={l.to} className="text-[14px] text-[var(--ed-ink-2)] link-under">{l.label}</Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-          <div>
-            <h4 className="font-bold text-slate-900 mb-6">Explore</h4>
-            <ul className="space-y-4 text-sm text-slate-500 font-medium">
-              <li><Link to="/features" className="hover:text-teal-600 transition-colors">Features</Link></li>
-              <li><Link to="/how-it-works" className="hover:text-teal-600 transition-colors">How it Works</Link></li>
-              <li><Link to="/community" className="hover:text-teal-600 transition-colors">Community</Link></li>
-              <li><Link to="/signup" className="hover:text-teal-600 transition-colors">Get Started</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold text-slate-900 mb-6">Company</h4>
-            <ul className="space-y-4 text-sm text-slate-500 font-medium">
-              <li><a href="#" className="hover:text-teal-600 transition-colors">About Us</a></li>
-              <li><a href="#" className="hover:text-teal-600 transition-colors">Careers</a></li>
-              <li><a href="#" className="hover:text-teal-600 transition-colors">Blog</a></li>
-              <li><a href="#" className="hover:text-teal-600 transition-colors">Contact</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold text-slate-900 mb-6">Contact</h4>
-            <ul className="space-y-4 text-sm text-slate-500 font-medium">
-              <li className="flex items-center gap-3"><Mail size={16} /> support@pawportal.com</li>
-              <li className="flex items-center gap-3"><Phone size={16} /> +1 (555) 123-4567</li>
-              <li className="flex items-center gap-3"><MapPin size={16} /> 123 Puppy Lane, SF, CA</li>
-            </ul>
-          </div>
+          ))}
         </div>
 
-        <div className="border-t border-slate-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400 font-bold uppercase tracking-wider">
-          <p>&copy; 2024 PawPortal Inc. All rights reserved.</p>
-          <div className="flex gap-8">
-            <a href="#" className="hover:text-slate-600">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-600">Terms of Service</a>
-            <button onClick={() => nav('/admin')} className="hover:text-slate-600 uppercase">Admin Portal</button>
+        <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-[var(--ed-line)] pt-8 sm:flex-row sm:items-center">
+          <p className="text-[12px] text-[var(--ed-muted)]">© {new Date().getFullYear()} PawPortal Inc.</p>
+          <div className="flex items-center gap-6 text-[12px] text-[var(--ed-ink-2)]">
+            <a href="#" className="link-under">Privacy</a>
+            <a href="#" className="link-under">Terms</a>
+            <button onClick={() => nav('/admin')} className="link-under">Admin</button>
           </div>
         </div>
       </div>
