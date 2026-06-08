@@ -2,10 +2,23 @@
 import { GoogleGenAI } from "@google/genai";
 import { Pet, ServiceProvider, CarePlan, PawScanResult, HealthRecord } from "../types";
 
-// Initialize the client with the API key from the environment
+// Lazily initialize the client with the API key from the environment.
 // Note: In a real production app, you might proxy this through a backend to hide the key,
 // but for this client-side demo we access process.env.API_KEY directly as instructed.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// The client is created on first use (not at import time) so that a missing API key
+// fails gracefully inside each function's try/catch instead of crashing the whole app
+// (the SDK throws "An API Key must be set when running in a browser" if the key is absent).
+let _ai: GoogleGenAI | null = null;
+const getAi = (): GoogleGenAI => {
+  if (!_ai) {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error('AI features are unavailable: GEMINI_API_KEY was not set at build time.');
+    }
+    _ai = new GoogleGenAI({ apiKey });
+  }
+  return _ai;
+};
 
 const MODEL_NAME = 'gemini-2.5-flash';
 
@@ -21,7 +34,7 @@ export const generatePetAdvice = async (query: string, context?: string): Promis
       Format with simple paragraphs.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
     });
@@ -44,7 +57,7 @@ export const formatMedicalRecord = async (roughNotes: string): Promise<string> =
       Rough Notes: "${roughNotes}"
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await getAi().models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
     });
@@ -71,7 +84,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
         If no major risks, return an empty array.
       `;
   
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: { responseMimeType: 'application/json' }
@@ -105,7 +118,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
           5. Warm sign-off.
         `;
     
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
           model: MODEL_NAME,
           contents: prompt,
         });
@@ -131,7 +144,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
         Example: ["Pancreatitis", "Foreign Body Obstruction", "Gastroenteritis"]
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: { responseMimeType: 'application/json' }
@@ -155,7 +168,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
         Return a JSON array of warning strings. If it seems safe, return an empty array.
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: { responseMimeType: 'application/json' }
@@ -180,7 +193,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
         Assume realistic PKR pricing for a home visit vet in Pakistan.
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: { responseMimeType: 'application/json' }
@@ -207,7 +220,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
         - "advice": A concise 1-2 sentence recommendation on what to do next.
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: { responseMimeType: 'application/json' }
@@ -236,7 +249,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
             Example: { "description": "...", "tags": ["..."], "category": "Toy", "suggestedPrice": 1500 }
           `;
 
-          const response = await ai.models.generateContent({
+          const response = await getAi().models.generateContent({
               model: MODEL_NAME,
               contents: prompt,
               config: { responseMimeType: 'application/json' }
@@ -290,7 +303,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
           Return a JSON object: { "insight": "string", "questions": ["q1", "q2", "q3"], "compatibilityScore": number }
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: { responseMimeType: 'application/json' }
@@ -339,7 +352,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
           }
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: { responseMimeType: 'application/json' }
@@ -384,7 +397,7 @@ export const analyzeClinicalRisks = async (currentNotes: string, patientHistoryS
           }
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await getAi().models.generateContent({
             model: MODEL_NAME,
             contents: {
                 parts: [
