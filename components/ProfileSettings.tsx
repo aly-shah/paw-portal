@@ -1,7 +1,10 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, User, CreditCard, Shield, CheckCircle, Smartphone, Building2, Lock, Bell, Globe, Camera, Save, AlertCircle, Briefcase, Award, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
+import { fileToDataUrl } from '../services/image';
 
 interface ProfileSettingsProps {
   isOpen: boolean;
@@ -12,29 +15,58 @@ interface ProfileSettingsProps {
 type Tab = 'GENERAL' | 'FINANCIAL' | 'PREFERENCES' | 'SECURITY' | 'VERIFICATION';
 
 const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, userRole }) => {
+  const { user, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('GENERAL');
   const [isEditing, setIsEditing] = useState(false);
-  
-  // Mock User Data
+  const [saving, setSaving] = useState(false);
+
+  // Real account data: name/email/avatar come from the signed-in user; the rest
+  // (phone, address, bio, prefs) is persisted per-user in the 'accountProfile' collection.
   const [userData, setUserData] = useState({
-    name: userRole === UserRole.VET ? 'Dr. Jane Smith' : 'Jane Doe',
-    email: 'jane@example.com',
-    phone: '+92 300 1234567',
-    address: 'DHA Phase 6, Karachi',
-    bio: userRole === UserRole.VET ? 'Experienced veterinarian specializing in small animal internal medicine.' : 'Dog lover and proud owner of Barnaby.',
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: '',
+    address: '',
+    bio: '',
     language: 'English',
     notifications: { email: true, sms: true, push: true },
     availability: true, // For providers
   });
 
-  // Mock Financial Data
   const [financials, setFinancials] = useState({
-    jazzcash: '0300 1234567',
+    jazzcash: '',
     easypaisa: '',
-    bankName: 'Meezan Bank',
-    iban: 'PK36 MEZN 0000 0000 1234 5678',
-    accountTitle: 'Jane Smith'
+    bankName: '',
+    iban: '',
+    accountTitle: ''
   });
+
+  // Keep name/email in sync with the authenticated user, and load saved extended
+  // profile fields whenever the modal opens.
+  useEffect(() => {
+    if (!isOpen) return;
+    setUserData(prev => ({ ...prev, name: user?.name || prev.name, email: user?.email || prev.email }));
+    setAvatar(user?.avatar || 'https://picsum.photos/id/64/150/150');
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await api.list<any>('user', 'accountProfile');
+        if (cancelled || !rows[0]) return;
+        const p = rows[0];
+        setUserData(prev => ({
+          ...prev,
+          phone: p.phone ?? prev.phone,
+          address: p.address ?? prev.address,
+          bio: p.bio ?? prev.bio,
+          language: p.language ?? prev.language,
+          notifications: p.notifications ?? prev.notifications,
+          availability: p.availability ?? prev.availability,
+        }));
+        if (p.financials) setFinancials(p.financials);
+      } catch { /* keep defaults */ }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, user]);
 
   // Password Visibility States
   const [showCurrentPass, setShowCurrentPass] = useState(false);
@@ -42,7 +74,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
   const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   // Avatar upload + lightweight toast feedback
-  const [avatar, setAvatar] = useState('https://picsum.photos/id/64/150/150');
+  const [avatar, setAvatar] = useState(user?.avatar || 'https://picsum.photos/id/64/150/150');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -52,10 +84,40 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
     setTimeout(() => setToast(null), 2500);
   };
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setAvatar(URL.createObjectURL(e.target.files[0]));
-      showToast('Profile photo updated.');
+      try {
+        const dataUrl = await fileToDataUrl(e.target.files[0]);
+        setAvatar(dataUrl);
+        showToast('Photo selected — click Save Changes to apply.');
+      } catch {
+        showToast('Could not read that image.');
+      }
+    }
+  };
+
+  // Persist name + avatar to the account, and the extended fields to the DB.
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await updateProfile({ name: userData.name.trim() || user?.name, avatar });
+      await api.create('user', 'accountProfile', {
+        id: 'me',
+        phone: userData.phone,
+        address: userData.address,
+        bio: userData.bio,
+        language: userData.language,
+        notifications: userData.notifications,
+        availability: userData.availability,
+        financials,
+      });
+      showToast('Profile saved.');
+      setTimeout(onClose, 600);
+    } catch (err: any) {
+      showToast(err?.message || 'Could not save profile.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -489,14 +551,12 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
                 <button onClick={onClose} className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">
                     Close
                 </button>
-                <button 
-                    className="px-6 py-2.5 rounded-xl font-bold bg-teal-600 text-white hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all flex items-center gap-2"
-                    onClick={() => {
-                        // Simulate save
-                        setTimeout(onClose, 500);
-                    }}
+                <button
+                    disabled={saving}
+                    className="px-6 py-2.5 rounded-xl font-bold bg-teal-600 text-white hover:bg-teal-700 shadow-lg shadow-teal-200 transition-all flex items-center gap-2 disabled:opacity-60"
+                    onClick={handleSave}
                 >
-                    <Save size={18} /> Save Changes
+                    <Save size={18} /> {saving ? 'Saving…' : 'Save Changes'}
                 </button>
             </div>
         </div>

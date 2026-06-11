@@ -43,6 +43,8 @@ export const api = {
   login: (body: { email: string; password: string }) =>
     request<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request<{ user: AuthUser }>('/auth/me'),
+  updateMe: (body: { name?: string; avatar?: string }) =>
+    request<{ user: AuthUser }>('/auth/me', { method: 'PUT', body: JSON.stringify(body) }),
 
   // --- Generic persistence ---
   list: <T = any>(scope: Scope, collection: string) =>

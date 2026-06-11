@@ -1910,8 +1910,11 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
                 </div>
 
                 {/* CENTER: ROOM GRID */}
-                <div className="flex-1 overflow-y-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="flex-1 overflow-y-auto min-w-0">
+                    {/* Auto-fill grid: columns wrap based on the actual available width of this
+                        center column (which is squeezed by the side panels), not the viewport —
+                        so cards stay readable instead of cramming 2-3 into a narrow space. */}
+                    <div className="grid [grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr))] gap-4">
                         {rooms.map(room => {
                             const StatusIcon = getTypeIcon(room.type);
                             const colorClass = getStatusColor(room.status);

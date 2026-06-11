@@ -14,6 +14,7 @@ interface AuthValue {
   loading: boolean; // true while we resolve an existing token on first load
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (input: RegisterInput) => Promise<AuthUser>;
+  updateProfile: (patch: { name?: string; avatar?: string }) => Promise<AuthUser>;
   logout: () => void;
 }
 
@@ -54,13 +55,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return user;
   }, []);
 
+  const updateProfile = useCallback(async (patch: { name?: string; avatar?: string }) => {
+    const { user } = await api.updateMe(patch);
+    setUser(user);
+    return user;
+  }, []);
+
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, updateProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

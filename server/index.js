@@ -92,6 +92,18 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
+// Update the signed-in user's display name and/or avatar.
+app.put('/api/auth/me', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const { name, avatar } = req.body || {};
+  const newName = typeof name === 'string' && name.trim() ? name.trim() : user.name;
+  const newAvatar = typeof avatar === 'string' && avatar ? avatar : user.avatar;
+  db.prepare('UPDATE users SET name = ?, avatar = ? WHERE id = ?').run(newName, newAvatar, req.userId);
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
+  res.json({ user: publicUser(updated) });
+});
+
 // ----------------------------------------------------------------------------
 // Generic persistence — per-user and global collections
 //   /api/user/:collection          (private to the authed user)
