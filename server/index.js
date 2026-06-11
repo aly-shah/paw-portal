@@ -177,6 +177,53 @@ app.delete('/api/:scope/:collection/:itemId', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Social actions on GLOBAL items (any authenticated user) ---
+// These only touch likes/comments, never the item's content, so they're safe for
+// non-authors (unlike the author-restricted PUT above).
+function saveGlobalData(collection, itemId, data) {
+  db.prepare('UPDATE items SET data = ?, updated_at = ? WHERE scope = ? AND collection = ? AND item_id = ?')
+    .run(JSON.stringify(data), now(), 'global', collection, itemId);
+}
+
+app.post('/api/global/:collection/:itemId/like', requireAuth, (req, res) => {
+  const { collection, itemId } = req.params;
+  if (!isValidCollection(collection)) return res.status(400).json({ error: 'Bad request' });
+  const row = findItem('global', collection, itemId);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+
+  const data = JSON.parse(row.data);
+  const likedBy = Array.isArray(data.likedBy) ? data.likedBy : [];
+  const has = likedBy.includes(req.userId);
+  data.likedBy = has ? likedBy.filter((uid) => uid !== req.userId) : [...likedBy, req.userId];
+  data.likes = Math.max(0, (typeof data.likes === 'number' ? data.likes : 0) + (has ? -1 : 1));
+  saveGlobalData(collection, itemId, data);
+  res.json(data);
+});
+
+app.post('/api/global/:collection/:itemId/comment', requireAuth, (req, res) => {
+  const { collection, itemId } = req.params;
+  if (!isValidCollection(collection)) return res.status(400).json({ error: 'Bad request' });
+  const row = findItem('global', collection, itemId);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+
+  const text = req.body && typeof req.body.text === 'string' ? req.body.text.trim() : '';
+  if (!text) return res.status(400).json({ error: 'Comment text required' });
+
+  const author = db.prepare('SELECT name, avatar FROM users WHERE id = ?').get(req.userId);
+  const data = JSON.parse(row.data);
+  const comments = Array.isArray(data.comments) ? data.comments : [];
+  comments.push({
+    id: newId(),
+    user: (author && author.name) || 'Anonymous',
+    avatar: (author && author.avatar) || '',
+    text,
+    timestamp: now(),
+  });
+  data.comments = comments;
+  saveGlobalData(collection, itemId, data);
+  res.json(data);
+});
+
 function findItem(scope, collection, itemId) {
   return db.prepare('SELECT * FROM items WHERE scope = ? AND collection = ? AND item_id = ?').get(scope, collection, itemId);
 }

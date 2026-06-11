@@ -137,6 +137,7 @@ export interface Post {
     likes: number;
     comments: Comment[];
     isLiked?: boolean;
+    likedBy?: string[]; // user ids who liked this post (per-user like state)
     // Commerce / Action Fields
     price?: number;
     actionLabel?: string; // e.g., "Shop Now", "Book Visit"

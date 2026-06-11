@@ -55,4 +55,10 @@ export const api = {
     request<T>(`/${scope}/${collection}/${id}`, { method: 'PUT', body: JSON.stringify(item) }),
   remove: (scope: Scope, collection: string, id: string) =>
     request<{ ok: boolean }>(`/${scope}/${collection}/${id}`, { method: 'DELETE' }),
+
+  // --- Social actions on global items (likes/comments by any signed-in user) ---
+  likeGlobal: <T = any>(collection: string, id: string) =>
+    request<T>(`/global/${collection}/${id}/like`, { method: 'POST' }),
+  commentGlobal: <T = any>(collection: string, id: string, text: string) =>
+    request<T>(`/global/${collection}/${id}/comment`, { method: 'POST', body: JSON.stringify({ text }) }),
 };

@@ -106,19 +106,31 @@ const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void })
     );
 };
 
+// Render a comment timestamp nicely whether it's an ISO date (from the server)
+// or a friendly string like "Just now" (optimistic / seeded).
+const formatCommentTime = (ts: string) => {
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? ts : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 // --- SUB-COMPONENT: Feed Post ---
-const FeedPost: React.FC<{ post: Post; onNotify: (message: string) => void }> = ({ post, onNotify }) => {
-    const [isLiked, setIsLiked] = useState(post.isLiked);
-    const [likes, setLikes] = useState(post.likes);
-    const [comments, setComments] = useState<Comment[]>(post.comments);
+const FeedPost: React.FC<{
+    post: Post;
+    onNotify: (message: string) => void;
+    currentUserId?: string;
+    onToggleLike: (post: Post) => void;
+    onAddComment: (post: Post, text: string) => void;
+}> = ({ post, onNotify, currentUserId, onToggleLike, onAddComment }) => {
+    // Like/comment state is derived from the persisted post (source of truth),
+    // not local state — so it survives refresh.
+    const isLiked = !!(currentUserId && post.likedBy?.includes(currentUserId));
+    const likes = post.likes;
+    const comments = post.comments;
     const [showComments, setShowComments] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [menuOpen, setMenuOpen] = useState(false);
 
-    const toggleLike = () => {
-        setIsLiked(!isLiked);
-        setLikes(prev => isLiked ? prev - 1 : prev + 1);
-    };
+    const toggleLike = () => onToggleLike(post);
 
     const handleShare = async () => {
         const shareUrl = window.location.href;
@@ -158,14 +170,7 @@ const FeedPost: React.FC<{ post: Post; onNotify: (message: string) => void }> = 
 
     const addComment = () => {
         if (!commentText.trim()) return;
-        const newComment: Comment = {
-            id: `c-${Date.now()}`,
-            user: 'Jane Doe',
-            avatar: 'https://picsum.photos/id/64/100/100',
-            text: commentText.trim(),
-            timestamp: 'Just now',
-        };
-        setComments(prev => [...prev, newComment]);
+        onAddComment(post, commentText);
         setCommentText('');
     };
 
@@ -290,7 +295,7 @@ const FeedPost: React.FC<{ post: Post; onNotify: (message: string) => void }> = 
                             <div className="bg-slate-50 rounded-2xl px-3 py-2 flex-1">
                                 <div className="flex items-center gap-2">
                                     <p className="text-xs font-bold text-slate-700">{c.user}</p>
-                                    <p className="text-[10px] text-slate-400">{c.timestamp}</p>
+                                    <p className="text-[10px] text-slate-400">{formatCommentTime(c.timestamp)}</p>
                                 </div>
                                 <p className="text-xs text-slate-600 leading-relaxed">{c.text}</p>
                             </div>
@@ -1017,6 +1022,40 @@ const Community: React.FC = () => {
           });
   };
 
+  // Toggle the current user's like on a post — persisted server-side (per-user).
+  const handleToggleLike = (post: Post) => {
+      if (!user) { notify('Please sign in to like posts.'); return; }
+      const likedBy = post.likedBy || [];
+      const has = likedBy.includes(user.id);
+      const optimistic: Post = {
+          ...post,
+          likedBy: has ? likedBy.filter(uid => uid !== user.id) : [...likedBy, user.id],
+          likes: Math.max(0, post.likes + (has ? -1 : 1)),
+      };
+      setPosts(prev => prev.map(p => (p.id === post.id ? optimistic : p)));
+      api.likeGlobal<Post>('posts', post.id)
+          .then(updated => setPosts(prev => prev.map(p => (p.id === post.id ? { ...p, ...updated } : p))))
+          .catch(() => { /* keep optimistic */ });
+  };
+
+  // Add a comment to a post — persisted server-side (authored by current user).
+  const handleAddComment = (post: Post, text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      if (!user) { notify('Please sign in to comment.'); return; }
+      const optimisticComment: Comment = {
+          id: `c-${Date.now()}`,
+          user: user.name || 'You',
+          avatar: user.avatar || 'https://picsum.photos/id/64/100/100',
+          text: trimmed,
+          timestamp: 'Just now',
+      };
+      setPosts(prev => prev.map(p => (p.id === post.id ? { ...p, comments: [...p.comments, optimisticComment] } : p)));
+      api.commentGlobal<Post>('posts', post.id, trimmed)
+          .then(updated => setPosts(prev => prev.map(p => (p.id === post.id ? { ...p, ...updated } : p))))
+          .catch(() => { /* keep optimistic */ });
+  };
+
   const handleCreateEvent = (newEvent: Event) => {
       setEvents([newEvent, ...events]);
       setShowEventModal(false);
@@ -1186,7 +1225,14 @@ const Community: React.FC = () => {
                
                <div className="space-y-6">
                    {filteredPosts.map(post => (
-                       <FeedPost key={post.id} post={post} onNotify={notify} />
+                       <FeedPost
+                           key={post.id}
+                           post={post}
+                           onNotify={notify}
+                           currentUserId={user?.id}
+                           onToggleLike={handleToggleLike}
+                           onAddComment={handleAddComment}
+                       />
                    ))}
                    {filteredPosts.length === 0 && (
                        <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
