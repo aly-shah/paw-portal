@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Pet, HealthRecord, Reminder, CarePlan, PetSafetyStatus, FoundReport,
   AvailabilitySlot, Appointment, PawPointsEntry, PawBadge, Reward, PointReason,
@@ -11,6 +11,8 @@ import { useAuth } from './AuthContext';
 const dayMs = 86_400_000;
 const inDays = (n: number) => new Date(Date.now() + n * dayMs).toISOString();
 const ago = (n: number) => new Date(Date.now() - n * dayMs).toISOString();
+// Local calendar day key (YYYY-MM-DD) for the daily login streak.
+const dateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 let seq = 1000;
 const id = () => `gen-${++seq}-${Date.now().toString(36)}`;
 
@@ -52,7 +54,7 @@ const seedLedger = (): PawPointsEntry[] => [
   { id: id(), delta: 100, reason: 'APPOINTMENT', label: 'Attended vet checkup', timestamp: ago(5) },
 ];
 
-interface ProfileMeta { id: 'me'; pawPoints: number; streak: number; seeded: boolean }
+interface ProfileMeta { id: 'me'; pawPoints: number; streak: number; seeded: boolean; lastActiveDate?: string }
 
 interface PawDataValue {
   myPets: Pet[];
@@ -121,6 +123,8 @@ export const PawDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [streak, setStreak] = useState(0);
   const [ledger, setLedger] = useState<PawPointsEntry[]>([]);
   const [badges, setBadges] = useState<PawBadge[]>([]);
+  // Last calendar day the user was active — drives the consecutive-day streak.
+  const lastActiveRef = useRef<string>('');
 
   // Load everything for the signed-in user; seed defaults once for new accounts.
   useEffect(() => {
@@ -149,12 +153,16 @@ export const PawDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ]);
         if (cancelled) return;
 
+        const today = dateKey(new Date());
+        const yesterday = dateKey(new Date(Date.now() - dayMs));
+        lastActiveRef.current = today;
+
         const profile = profiles[0];
         if (!profile || !profile.seeded) {
           // First login for this account — seed starter data into the DB.
           const sPets = seedPets(), sRecords = seedRecords(), sReminders = seedReminders();
           const sSlots = seedSlots(), sBadges = seedBadges(), sLedger = seedLedger();
-          const meta: ProfileMeta = { id: 'me', pawPoints: 2450, streak: 5, seeded: true };
+          const meta: ProfileMeta = { id: 'me', pawPoints: 2450, streak: 1, seeded: true, lastActiveDate: today };
 
           sPets.forEach((p) => pCreate(C.pets, p));
           sRecords.forEach((r) => pCreate(C.records, r));
@@ -172,7 +180,23 @@ export const PawDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setMyPets(pets); setHealthRecords(records); setReminders(rems);
           setFoundReports(found); setSlots(slts); setAppointments(appts);
           setLedger(ldgr); setBadges(bdgs);
-          setPawPoints(profile.pawPoints ?? 0); setStreak(profile.streak ?? 0);
+          setPawPoints(profile.pawPoints ?? 0);
+
+          // Daily streak: same day -> unchanged; consecutive day -> +1; gap -> reset to 1.
+          const prevStreak = profile.streak ?? 0;
+          const last = profile.lastActiveDate;
+          let newStreak: number;
+          if (last === today) newStreak = Math.max(1, prevStreak);
+          else if (last === yesterday) newStreak = prevStreak + 1;
+          else newStreak = 1;
+          setStreak(newStreak);
+
+          if (last !== today) {
+            pUpdate(C.profile, 'me', {
+              ...profile, id: 'me', seeded: true, streak: newStreak, lastActiveDate: today,
+            });
+          }
+
           const safetyMap: Record<string, PetSafetyStatus> = {};
           saf.forEach((s) => { safetyMap[s.petId] = s; });
           setSafety(safetyMap);
@@ -186,7 +210,10 @@ export const PawDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user]);
 
   const persistProfile = useCallback((points: number, strk: number) => {
-    const meta: ProfileMeta = { id: 'me', pawPoints: points, streak: strk, seeded: true };
+    const meta: ProfileMeta = {
+      id: 'me', pawPoints: points, streak: strk, seeded: true,
+      lastActiveDate: lastActiveRef.current || undefined,
+    };
     pUpdate(C.profile, 'me', meta);
   }, []);
 
