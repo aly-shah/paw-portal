@@ -5,6 +5,7 @@ import { Search, Edit2, Save, Camera, Eye, Sparkles, Trash2, Activity, Smile, Dn
 import HeritageDashboard from './genetics/HeritageDashboard';
 import AdoptionCenter from './AdoptionCenter';
 import { usePawData } from '../contexts/PawDataContext';
+import { fileToDataUrl } from '../services/image';
 
 const PetProfileManager: React.FC = () => {
   const { myPets: pets, addPet, updatePet, deletePet } = usePawData();
@@ -124,11 +125,14 @@ const PetProfileManager: React.FC = () => {
     setIsEditing(false);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        const imageUrl = URL.createObjectURL(file);
-        setFormData(prev => ({ ...prev, image: imageUrl }));
+        try {
+            const dataUrl = await fileToDataUrl(e.target.files[0]);
+            setFormData(prev => ({ ...prev, image: dataUrl }));
+        } catch {
+            // ignore unreadable files
+        }
     }
   };
 

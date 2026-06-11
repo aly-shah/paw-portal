@@ -1,6 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Phone, Video, Info, Image as ImageIcon, Mic, Send, MoreHorizontal, Plus, X, FileText, ChevronRight, Smile, Paperclip, Check, CheckCheck, Users, Stethoscope, ShoppingBag, HeartHandshake, MicOff, VideoOff, ChevronLeft, ArrowLeft, MessageCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 // --- Mock Contacts Directory (Cross-Role) ---
 const MOCK_DIRECTORY = [
@@ -145,9 +147,43 @@ const CallOverlay = ({ user, type, onClose }: { user: any, type: 'voice' | 'vide
 };
 
 const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
+  const { user } = useAuth();
   const [activeConversationId, setActiveConversationId] = useState<string>(INITIAL_CONVERSATIONS[0].id);
   const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
   const [input, setInput] = useState('');
+  const [convSearch, setConvSearch] = useState('');
+
+  // Load the user's saved inbox once, then persist on every change. Conversations
+  // are stored as a single per-user document so sent messages survive a refresh.
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await api.list<any>('user', 'inbox');
+        if (cancelled) return;
+        const saved = rows[0]?.conversations;
+        if (saved && saved.length) {
+          setConversations(saved);
+          setActiveConversationId(saved[0].id);
+        } else {
+          api.create('user', 'inbox', { id: 'state', conversations: INITIAL_CONVERSATIONS }).catch(() => {});
+        }
+      } catch {
+        // keep the in-memory defaults
+      } finally {
+        loadedRef.current = true;
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    // POST upserts (server does ON CONFLICT DO UPDATE), so this saves the latest state.
+    api.create('user', 'inbox', { id: 'state', conversations }).catch(() => {});
+  }, [conversations]);
   const [showInfoPane, setShowInfoPane] = useState(false); 
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [activeCall, setActiveCall] = useState<{ user: any, type: 'voice' | 'video' } | null>(null);
@@ -298,16 +334,26 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
               {/* Search */}
               <div className="relative">
                   <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Search Messenger" 
+                  <input
+                    type="text"
+                    placeholder="Search Messenger"
+                    value={convSearch}
+                    onChange={(e) => setConvSearch(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 rounded-full text-sm transition-all outline-none"
                   />
               </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-              {conversations.map(chat => (
+              {conversations
+                .filter(chat => {
+                  const q = convSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return chat.user.name.toLowerCase().includes(q)
+                    || chat.user.role.toLowerCase().includes(q)
+                    || chat.lastMessage.toLowerCase().includes(q);
+                })
+                .map(chat => (
                   <div 
                     key={chat.id}
                     onClick={() => handleConversationClick(chat.id)}

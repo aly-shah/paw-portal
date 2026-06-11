@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { MOCK_SERVICES, MOCK_PETS } from '../constants';
-import { ServiceType, ServiceProvider, Pet, MatchInsight } from '../types';
+import { ServiceType, ServiceProvider, Pet, MatchInsight, AvailabilitySlot } from '../types';
 import { MapPin, Star, CheckCircle, Phone, Clock, Search, Filter, X, Calendar, ChevronRight, Map, List, Stethoscope, Building2, Scissors, User, Siren, AlertTriangle, Plus, Minus, Navigation, Share2, MessageCircle, Shield, Tag, Briefcase, Check, Sparkles, BrainCircuit, Copy, Coins, Lock, Unlock } from 'lucide-react';
-import { FindCareSection } from './FindCare'; 
+import { FindCareSection } from './FindCare';
 import { generateProviderQuestions } from '../services/geminiService';
+import { usePawData } from '../contexts/PawDataContext';
 
 interface ServiceFinderProps {
     initialFilter?: ServiceType;
@@ -37,18 +38,18 @@ const DealsCarousel = () => {
 };
 
 // --- SUB-COMPONENT: Provider Profile Modal ---
-const ProviderProfileModal = ({ provider, onClose, onBook, userCredits, onDeductCredit, onNavigate }: { provider: ServiceProvider, onClose: () => void, onBook: () => void, userCredits: number, onDeductCredit: () => void, onNavigate?: (tab: string, context?: any) => void }) => {
+const ProviderProfileModal = ({ provider, onClose, onBook, userCredits, onDeductCredit, onNavigate, pets, onSaveMatch }: { provider: ServiceProvider, onClose: () => void, onBook: () => void, userCredits: number, onDeductCredit: () => void, onNavigate?: (tab: string, context?: any) => void, pets: Pet[], onSaveMatch: (petId: string, match: MatchInsight) => void }) => {
     const [activeTab, setActiveTab] = useState<'ABOUT' | 'MATCH' | 'REVIEWS'>('ABOUT');
-    
-    // Local state to manage pets with their cached insights for this session
-    // In a real app, MOCK_PETS would be from a global context/store
-    const [localPets, setLocalPets] = useState<Pet[]>(MOCK_PETS); 
+
+    // Use the real, persisted pets from the data context. Fall back to mocks
+    // only if the account has no pets yet, so Smart Match still has something to show.
+    const localPets = pets.length > 0 ? pets : MOCK_PETS;
     const [selectedPetId, setSelectedPetId] = useState(localPets[0]?.id);
-    
+
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const selectedPet = localPets.find(p => p.id === selectedPetId);
-    
+
     // Check if we have a saved match for this specific provider
     const existingMatch = selectedPet?.savedMatches?.find(m => m.providerId === provider.id);
 
@@ -58,12 +59,12 @@ const ProviderProfileModal = ({ provider, onClose, onBook, userCredits, onDeduct
             alert("Insufficient credits!");
             return;
         }
-        
+
         setIsAnalyzing(true);
-        
+
         // Simulate API call with delay
         const result = await generateProviderQuestions(provider, selectedPet);
-        
+
         const newMatch: MatchInsight = {
             providerId: provider.id,
             timestamp: Date.now(),
@@ -72,18 +73,8 @@ const ProviderProfileModal = ({ provider, onClose, onBook, userCredits, onDeduct
             compatibilityScore: result.compatibilityScore
         };
 
-        // Update Local Pet State (Simulating DB Save)
-        const updatedPets = localPets.map(p => {
-            if (p.id === selectedPetId) {
-                const oldMatches = p.savedMatches || [];
-                // Remove old match for this provider if exists, add new one
-                const newMatches = [...oldMatches.filter(m => m.providerId !== provider.id), newMatch];
-                return { ...p, savedMatches: newMatches };
-            }
-            return p;
-        });
-
-        setLocalPets(updatedPets);
+        // Persist the insight onto the pet via the data context (survives refresh).
+        onSaveMatch(selectedPet.id, newMatch);
         onDeductCredit(); // Deduct credit via parent callback
         setIsAnalyzing(false);
     };
@@ -331,6 +322,8 @@ const ProviderProfileModal = ({ provider, onClose, onBook, userCredits, onDeduct
 };
 
 const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate }) => {
+  const { myPets, book, updatePet } = usePawData();
+
   // --- TAB STATE (Main Switch) ---
   const [activeTab, setActiveTab] = useState<'SEARCH' | 'CARE'>('SEARCH');
 
@@ -395,10 +388,13 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
   ];
 
   // --- SUB-COMPONENT: Enhanced Booking Modal ---
-  const BookingModal = ({ provider, onClose, onConfirm }: { provider: ServiceProvider, onClose: () => void, onConfirm: () => void }) => {
+  const BookingModal = ({ provider, onClose, onConfirm }: { provider: ServiceProvider, onClose: () => void, onConfirm: (payload: { dayOffset: number; time: string; serviceIds: string[]; petId: string; totalEstimate: number }) => void }) => {
       const [selectedDate, setSelectedDate] = useState<number | null>(null);
       const [selectedTime, setSelectedTime] = useState<string | null>(null);
-      
+
+      // Which pet the booking is for — real pets from the data context.
+      const [selectedPetId, setSelectedPetId] = useState<string>(myPets[0]?.id || '');
+
       // Initialize services. If only 1 available, select it by default.
       const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
@@ -407,6 +403,11 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
               setSelectedServiceIds([provider.services[0].id]);
           }
       }, [provider]);
+
+      useEffect(() => {
+          // Keep the default pet in sync once pets load.
+          if (!selectedPetId && myPets[0]) setSelectedPetId(myPets[0].id);
+      }, [myPets, selectedPetId]);
 
       const toggleService = (id: string) => {
           if (selectedServiceIds.includes(id)) {
@@ -438,7 +439,33 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
                   </div>
 
                   <div className="p-6 overflow-y-auto space-y-6">
-                      
+
+                      {/* Pet Selection */}
+                      <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">For which pet?</label>
+                          {myPets.length > 0 ? (
+                              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                  {myPets.map(pet => {
+                                      const isSelected = selectedPetId === pet.id;
+                                      return (
+                                          <button
+                                              key={pet.id}
+                                              onClick={() => setSelectedPetId(pet.id)}
+                                              className={`flex items-center gap-2 p-1.5 pr-4 rounded-full border-2 transition-all whitespace-nowrap ${
+                                                  isSelected ? 'border-teal-500 bg-teal-50' : 'border-slate-100 hover:border-slate-200'
+                                              }`}
+                                          >
+                                              <img src={pet.image} className="w-7 h-7 rounded-full object-cover" />
+                                              <span className="font-bold text-sm text-slate-700">{pet.name}</span>
+                                          </button>
+                                      );
+                                  })}
+                              </div>
+                          ) : (
+                              <p className="text-sm text-slate-400 italic">Add a pet to your profile to book an appointment.</p>
+                          )}
+                      </div>
+
                       {/* Service Selection - Tags */}
                       <div>
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Select Services</label>
@@ -526,9 +553,9 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
                               {totalEstimate > 0 ? `PKR ${totalEstimate.toLocaleString()}` : provider.priceRange}
                           </p>
                       </div>
-                      <button 
-                          disabled={selectedDate === null || selectedTime === null || (provider.services && provider.services.length > 0 && selectedServiceIds.length === 0)}
-                          onClick={onConfirm}
+                      <button
+                          disabled={selectedDate === null || selectedTime === null || !selectedPetId || (provider.services && provider.services.length > 0 && selectedServiceIds.length === 0)}
+                          onClick={() => onConfirm({ dayOffset: selectedDate!, time: selectedTime!, serviceIds: selectedServiceIds, petId: selectedPetId, totalEstimate })}
                           className="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-95 flex items-center gap-2"
                       >
                           Confirm Booking <ChevronRight size={16} />
@@ -537,6 +564,48 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
               </div>
           </div>
       );
+  };
+
+  // Map the ServiceFinder's own provider/date/time selection onto the shared
+  // AvailabilitySlot shape, then persist through the data context's `book`.
+  // This writes a real Appointment to the backend (survives refresh) and shows
+  // up in the Booking Center alongside slot-based bookings.
+  const persistBooking = (
+      provider: ServiceProvider,
+      payload: { dayOffset: number; time: string; serviceIds: string[]; petId: string; totalEstimate: number },
+  ) => {
+      // Build an ISO start datetime from the selected day + 12h time label.
+      const start = new Date();
+      start.setDate(start.getDate() + payload.dayOffset);
+      const m = payload.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (m) {
+          let hours = parseInt(m[1], 10);
+          const mins = parseInt(m[2], 10);
+          const meridiem = m[3].toUpperCase();
+          if (meridiem === 'PM' && hours !== 12) hours += 12;
+          if (meridiem === 'AM' && hours === 12) hours = 0;
+          start.setHours(hours, mins, 0, 0);
+      }
+
+      const chosen = (provider.services || []).filter(s => payload.serviceIds.includes(s.id));
+      const reason = chosen.length > 0 ? chosen.map(s => s.name).join(', ') : 'General consultation';
+      // Estimate is in PKR (whole units in mock data); store as cents for the Appointment shape.
+      const priceCents = (payload.totalEstimate > 0 ? payload.totalEstimate : 0) * 100;
+
+      const slot: AvailabilitySlot = {
+          id: `sf-${provider.id}-${Date.now()}`,
+          providerId: provider.id,
+          providerName: provider.name,
+          providerImage: provider.image,
+          serviceType: (Object.values(ServiceType).includes(provider.type as ServiceType) ? provider.type : ServiceType.CLINIC) as ServiceType,
+          start: start.toISOString(),
+          durationMin: 30,
+          priceCents,
+          mode: 'IN_PERSON',
+          isBooked: false,
+      };
+
+      book(slot, payload.petId, reason);
   };
 
   return (
@@ -738,7 +807,7 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
 
       {/* Provider Profile Modal */}
       {viewingProvider && (
-          <ProviderProfileModal 
+          <ProviderProfileModal
             provider={viewingProvider}
             onClose={() => setViewingProvider(null)}
             onBook={() => {
@@ -748,15 +817,24 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
             userCredits={userCredits}
             onDeductCredit={() => setUserCredits(prev => Math.max(0, prev - 1))}
             onNavigate={onNavigate}
+            pets={myPets}
+            onSaveMatch={(petId, match) => {
+                const pet = myPets.find(p => p.id === petId);
+                if (!pet) return;
+                const oldMatches = pet.savedMatches || [];
+                const newMatches = [...oldMatches.filter(m => m.providerId !== match.providerId), match];
+                updatePet({ ...pet, savedMatches: newMatches });
+            }}
           />
       )}
 
       {/* Enhanced Booking Modal */}
       {bookingProvider && (
-          <BookingModal 
-            provider={bookingProvider} 
+          <BookingModal
+            provider={bookingProvider}
             onClose={() => setBookingProvider(null)}
-            onConfirm={() => {
+            onConfirm={(payload) => {
+                persistBooking(bookingProvider, payload);
                 setBookingProvider(null);
                 setBookingSuccess(true);
                 setTimeout(() => setBookingSuccess(false), 4000);

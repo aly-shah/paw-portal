@@ -5,6 +5,7 @@ import { Calendar, MapPin, Users, Share2, Plus, X, Filter, MessageCircle, Copy, 
 import { Event, Post, PostType, UserRole, Connection, Comment } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { fileToDataUrl } from '../services/image';
 
 // --- SUB-COMPONENT: Create Post Widget ---
 const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void }) => {
@@ -15,10 +16,14 @@ const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void })
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
 
-    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setImage(URL.createObjectURL(e.target.files[0]));
-            setIsExpanded(true);
+            try {
+                setImage(await fileToDataUrl(e.target.files[0]));
+                setIsExpanded(true);
+            } catch {
+                // ignore unreadable files
+            }
         }
         e.target.value = ''; // allow re-selecting the same file
     };

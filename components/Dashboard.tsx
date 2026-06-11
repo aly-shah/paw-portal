@@ -11,6 +11,7 @@ import CareGiverDashboard from './care/CareGiverDashboard';
 import ClinicDashboard from './clinic/ClinicDashboard';
 import { usePawData } from '../contexts/PawDataContext';
 import { useAuth } from '../contexts/AuthContext';
+import { fileToDataUrl } from '../services/image';
 
 interface DashboardProps {
     role: UserRole;
@@ -89,11 +90,14 @@ const AddPetWizard: React.FC<AddPetWizardProps> = ({ onClose, onSave }) => {
         setIsOtherBreed(false);
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const imageUrl = URL.createObjectURL(file);
-            setFormData(prev => ({ ...prev, image: imageUrl }));
+            try {
+                const dataUrl = await fileToDataUrl(e.target.files[0]);
+                setFormData(prev => ({ ...prev, image: dataUrl }));
+            } catch {
+                // ignore unreadable files
+            }
         }
     };
 
