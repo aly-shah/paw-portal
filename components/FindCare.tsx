@@ -1315,8 +1315,15 @@ const JobPostingWizard: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 };
 
 // --- Responsive Job Card Sub-Component ---
-const JobCard: React.FC<{ job: JobListing }> = ({ job }) => {
+const JobCard: React.FC<{ job: JobListing; onCloseJob: (id: string) => void }> = ({ job, onCloseJob }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [acceptedApplicantId, setAcceptedApplicantId] = useState<string | null>(null);
+    const [actionNote, setActionNote] = useState<string | null>(null);
+
+    const flashNote = (msg: string) => {
+        setActionNote(msg);
+        setTimeout(() => setActionNote(null), 2500);
+    };
 
     return (
         <div 
@@ -1400,13 +1407,21 @@ const JobCard: React.FC<{ job: JobListing }> = ({ job }) => {
                                     </div>
                                 </div>
                                 <div className="flex gap-3 pt-4">
-                                    <button className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); flashNote('Editing is not available in this demo.'); }}
+                                        className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 flex items-center gap-2 transition-colors">
                                         <Edit3 size={14} /> Edit Job
                                     </button>
-                                    <button className="px-4 py-2 bg-white border border-slate-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50 hover:border-red-100 flex items-center gap-2 transition-colors">
-                                        <Trash2 size={14} /> Close Job
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onCloseJob(job.id); }}
+                                        disabled={job.status === 'CANCELLED'}
+                                        className="px-4 py-2 bg-white border border-slate-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50 hover:border-red-100 flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        <Trash2 size={14} /> {job.status === 'CANCELLED' ? 'Closed' : 'Close Job'}
                                     </button>
                                 </div>
+                                {actionNote && (
+                                    <p className="text-[11px] font-bold text-slate-500 animate-in fade-in">{actionNote}</p>
+                                )}
                             </div>
 
                             {/* Applicants Column */}
@@ -1426,11 +1441,16 @@ const JobCard: React.FC<{ job: JobListing }> = ({ job }) => {
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2">
-                                                    <button className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors" title="Message">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); flashNote(`Messaging ${applicant.name} is not available in this demo.`); }}
+                                                        className="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors" title="Message">
                                                         <MessageCircle size={16} />
                                                     </button>
-                                                    <button className="px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-1">
-                                                        <UserCheck size={14} /> Accept
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setAcceptedApplicantId(applicant.id); flashNote(`${applicant.name} accepted!`); }}
+                                                        disabled={acceptedApplicantId === applicant.id}
+                                                        className="px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-1 disabled:bg-emerald-600">
+                                                        <UserCheck size={14} /> {acceptedApplicantId === applicant.id ? 'Accepted' : 'Accept'}
                                                     </button>
                                                 </div>
                                             </div>
@@ -1455,6 +1475,19 @@ const JobCard: React.FC<{ job: JobListing }> = ({ job }) => {
 export const FindCareSection: React.FC = () => {
     const [showWizard, setShowWizard] = useState(false);
     const [myJobs, setMyJobs] = useState<JobListing[]>(MOCK_MY_JOBS);
+    const [activeFilter, setActiveFilter] = useState('All Jobs');
+
+    const filterStatusMap: Record<string, JobListing['status'] | undefined> = {
+        'All Jobs': undefined,
+        'Active': 'OPEN',
+        'Filled': 'FILLED',
+        'Drafts': 'CANCELLED',
+    };
+
+    const visibleJobs = myJobs.filter(job => {
+        const status = filterStatusMap[activeFilter];
+        return status ? job.status === status : true;
+    });
 
     return (
         <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in pb-20">
@@ -1475,9 +1508,10 @@ export const FindCareSection: React.FC = () => {
             {/* Filters Row */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {['All Jobs', 'Active', 'Filled', 'Drafts'].map(filter => (
-                    <button 
-                        key={filter} 
-                        className={`px-4 py-2 rounded-full text-xs font-bold border transition-all whitespace-nowrap ${filter === 'All Jobs' ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                    <button
+                        key={filter}
+                        onClick={() => setActiveFilter(filter)}
+                        className={`px-4 py-2 rounded-full text-xs font-bold border transition-all whitespace-nowrap ${filter === activeFilter ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                     >
                         {filter}
                     </button>
@@ -1486,16 +1520,18 @@ export const FindCareSection: React.FC = () => {
 
             {/* Interactive List View */}
             <div className="space-y-3">
-                {myJobs.map(job => (
-                    <JobCard key={job.id} job={job} />
+                {visibleJobs.map(job => (
+                    <JobCard key={job.id} job={job} onCloseJob={(id) => setMyJobs(prev => prev.map(j => j.id === id ? { ...j, status: 'CANCELLED' } : j))} />
                 ))}
 
                 {/* Empty State */}
-                {myJobs.length === 0 && (
+                {visibleJobs.length === 0 && (
                     <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-3xl">
                         <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500 font-medium">No jobs posted yet.</p>
-                        <button onClick={() => setShowWizard(true)} className="mt-4 text-teal-600 font-bold text-sm hover:underline">Post your first job</button>
+                        <p className="text-slate-500 font-medium">{myJobs.length === 0 ? 'No jobs posted yet.' : 'No jobs match this filter.'}</p>
+                        {myJobs.length === 0 && (
+                            <button onClick={() => setShowWizard(true)} className="mt-4 text-teal-600 font-bold text-sm hover:underline">Post your first job</button>
+                        )}
                     </div>
                 )}
             </div>

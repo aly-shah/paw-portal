@@ -5,8 +5,12 @@
 # What it does:
 #   1. Installs npm dependencies and builds the static site (-> ./dist)
 #   2. Serves ./dist on port 7070 via pm2 (SPA fallback enabled)
-#   3. Configures nginx as a reverse proxy for the domain
-#   4. Obtains/renews a Let's Encrypt SSL certificate via certbot
+#   3. Installs & runs the backend API (Express + SQLite) on port 7071 via pm2
+#   4. Configures nginx: proxies / to the SPA and /api to the backend
+#   5. Obtains/renews a Let's Encrypt SSL certificate via certbot
+#
+# The SQLite database + JWT secret live in server/data/ (gitignored) and persist
+# across redeploys, so accounts and user data are never wiped by a git pull.
 #
 # Usage (on the server):
 #   cd /var/www/<this-repo>
@@ -22,12 +26,15 @@ set -euo pipefail
 # ----------------------------------------------------------------------------
 APP_NAME="pawportal"
 PORT=7070
+API_NAME="pawportal-api"
+API_PORT=7071
 DOMAIN="paw.scalamedic.com"
 CERTBOT_EMAIL="hhhawkin989898@gmail.com"
 
 # Directory this script lives in (the repo root)
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST_DIR="$APP_DIR/dist"
+SERVER_DIR="$APP_DIR/server"
 
 # ----------------------------------------------------------------------------
 # Helpers
@@ -97,6 +104,28 @@ pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
 pm2 serve "$DIST_DIR" "$PORT" --name "$APP_NAME" --spa
 pm2 save
 
+# ----------------------------------------------------------------------------
+# 2b. Backend API (Express + SQLite) under pm2 on API_PORT
+# ----------------------------------------------------------------------------
+log "Installing API server dependencies..."
+cd "$SERVER_DIR"
+if [[ -f package-lock.json ]]; then
+  npm ci
+else
+  npm install
+fi
+# The SQLite DB + JWT secret live in server/data (gitignored) so they SURVIVE
+# every git pull / redeploy. DB_PATH makes the location explicit.
+mkdir -p "$SERVER_DIR/data"
+
+log "Starting/reloading pm2 process '$API_NAME' on port $API_PORT..."
+pm2 delete "$API_NAME" >/dev/null 2>&1 || true
+DB_PATH="$SERVER_DIR/data/pawportal.db" API_PORT="$API_PORT" \
+  pm2 start "$SERVER_DIR/index.js" --name "$API_NAME" \
+  --update-env
+pm2 save
+cd "$APP_DIR"
+
 # Make pm2 resurrect on reboot (prints/runs the systemd startup hook)
 log "Configuring pm2 to start on boot..."
 STARTUP_CMD="$(pm2 startup systemd -u "$USER" --hp "$HOME" 2>/dev/null | grep '^sudo ' || true)"
@@ -123,6 +152,19 @@ server {
     listen 80;
     listen [::]:80;
     server_name $DOMAIN;
+
+    # Allow base64 image uploads in API requests
+    client_max_body_size 6m;
+
+    # Backend API -> Express/SQLite server (must precede the catch-all below)
+    location /api/ {
+        proxy_pass         http://127.0.0.1:$API_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+    }
 
     # Reverse proxy to the pm2-served static SPA
     location / {
@@ -173,6 +215,9 @@ $SUDO systemctl reload nginx || true
 # Done
 # ----------------------------------------------------------------------------
 log "Deployment complete!"
-echo "  • App:    https://$DOMAIN  (via nginx -> 127.0.0.1:$PORT)"
-echo "  • pm2:    pm2 status / pm2 logs $APP_NAME"
+echo "  • App:    https://$DOMAIN          (nginx -> 127.0.0.1:$PORT static SPA)"
+echo "  • API:    https://$DOMAIN/api/health (nginx -> 127.0.0.1:$API_PORT Express+SQLite)"
+echo "  • DB:     $SERVER_DIR/data/pawportal.db  (persists across redeploys)"
+echo "  • Admin:  log in at /admin  ->  admin@pawportal.local / admin12345  (override via ADMIN_EMAIL/ADMIN_PASSWORD)"
+echo "  • pm2:    pm2 status / pm2 logs $APP_NAME / pm2 logs $API_NAME"
 echo "  • Rebuild & redeploy:  git pull && ./deploy.sh"

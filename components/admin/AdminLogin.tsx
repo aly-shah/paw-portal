@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert, Lock, User, ArrowRight, ShieldCheck, Server, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminLoginProps {
     onLoginSuccess: (role: UserRole) => void;
@@ -9,21 +10,33 @@ interface AdminLoginProps {
 }
 
 const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
+    const { login, logout } = useAuth();
     const [step, setStep] = useState<'CREDENTIALS' | '2FA'>('CREDENTIALS');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleCredentialsSubmit = (e: React.FormEvent) => {
+    const handleCredentialsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isLoading) return;
+        setError(null);
         setIsLoading(true);
-        // Simulate check
-        setTimeout(() => {
+        try {
+            const user = await login(email.trim(), password);
+            if (user.role !== UserRole.SUPER_ADMIN) {
+                logout();
+                setError('This account does not have super-admin access.');
+                return;
+            }
+            setStep('2FA'); // cosmetic second factor; real auth already succeeded
+        } catch (err: any) {
+            setError(err?.message || 'Authentication failed.');
+        } finally {
             setIsLoading(false);
-            setStep('2FA');
-        }, 1000);
+        }
     };
 
     const handle2FASubmit = (e: React.FormEvent) => {
@@ -32,7 +45,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
         setTimeout(() => {
             setIsLoading(false);
             onLoginSuccess(UserRole.SUPER_ADMIN);
-        }, 1500);
+        }, 800);
     };
 
     return (
@@ -99,8 +112,12 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
                                 </div>
                             </div>
 
-                            <button 
-                                type="submit" 
+                            {error && (
+                                <p className="text-xs font-bold text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2 text-center">{error}</p>
+                            )}
+
+                            <button
+                                type="submit"
                                 disabled={isLoading}
                                 className="w-full py-3 bg-white text-slate-950 rounded-xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 mt-4"
                             >

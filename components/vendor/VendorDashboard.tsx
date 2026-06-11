@@ -426,6 +426,16 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
     // Internal Note State
     const [newNote, setNewNote] = useState('');
 
+    // Product row action menu
+    const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
+
+    const handleDeleteProduct = (id: string) => {
+        setProducts(prev => prev.filter(p => p.id !== id));
+        setOpenRowMenu(null);
+        setShowToast({ message: 'Product removed from inventory.' });
+        setTimeout(() => setShowToast(null), 3000);
+    };
+
     // Sync initial tab
     useEffect(() => {
         if (initialTab === 'Orders') setActiveTab('ORDERS');
@@ -591,7 +601,9 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
                                         <ListIcon size={20} className="text-purple-600" />
                                         <span className="text-xs font-bold">Orders</span>
                                     </button>
-                                    <button className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl flex flex-col items-center gap-2 text-slate-700 transition-colors">
+                                    <button
+                                        onClick={() => { setShowToast({ message: 'Store settings are coming soon.' }); setTimeout(() => setShowToast(null), 3000); }}
+                                        className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl flex flex-col items-center gap-2 text-slate-700 transition-colors">
                                         <Settings size={20} className="text-slate-500" />
                                         <span className="text-xs font-bold">Settings</span>
                                     </button>
@@ -699,8 +711,21 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
                                                 {product.status}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-right">
-                                            <button className="p-2 hover:bg-white hover:shadow-md rounded-lg text-slate-400 hover:text-slate-600 transition-all"><MoreVertical size={16} /></button>
+                                        <td className="p-4 text-right relative">
+                                            <button
+                                                onClick={() => setOpenRowMenu(openRowMenu === product.id ? null : product.id)}
+                                                className="p-2 hover:bg-white hover:shadow-md rounded-lg text-slate-400 hover:text-slate-600 transition-all"><MoreVertical size={16} /></button>
+                                            {openRowMenu === product.id && (
+                                                <div className="absolute right-4 top-12 w-44 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-20 animate-in fade-in zoom-in-95 origin-top-right text-left">
+                                                    <button
+                                                        onClick={() => { setOpenRowMenu(null); setShowToast({ message: 'Product editing is coming soon.' }); setTimeout(() => setShowToast(null), 3000); }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">Edit</button>
+                                                    <div className="h-px bg-slate-100"></div>
+                                                    <button
+                                                        onClick={() => handleDeleteProduct(product.id)}
+                                                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">Delete</button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

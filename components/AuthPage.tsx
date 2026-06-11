@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dog, Mail, Lock, User, ArrowRight, ArrowLeft, Stethoscope, Building2, Store, HeartHandshake, Briefcase, Check, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AuthPageProps {
   initialView?: 'login' | 'signup';
@@ -10,10 +11,23 @@ interface AuthPageProps {
 }
 
 const AuthPage: React.FC<AuthPageProps> = ({ initialView = 'login', onLoginSuccess, onBack }) => {
+  const { login, register } = useAuth();
   const [isLogin, setIsLogin] = useState(initialView === 'login');
   const [loading, setLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.OWNER);
   const [showPassword, setShowPassword] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Real auth form state.
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 3000);
+    return () => clearTimeout(t);
+  }, [notice]);
   
   // State for Care Giver Tags
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -78,14 +92,21 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialView = 'login', onLoginSucce
       }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    setNotice(null);
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const authedUser = isLogin
+        ? await login(email.trim(), password)
+        : await register({ name: name.trim(), email: email.trim(), password, role: selectedRole });
+      onLoginSuccess(authedUser.role);
+    } catch (err: any) {
+      setNotice(err?.message || 'Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-      onLoginSuccess(selectedRole);
-    }, 1500);
+    }
   };
 
   const RoleButton: React.FC<{ role: UserRole; config: any }> = ({ role, config }) => {
@@ -116,6 +137,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialView = 'login', onLoginSucce
 
   return (
     <div className="min-h-screen flex bg-slate-50 font-sans">
+      {notice && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+          {notice}
+        </div>
+      )}
       {/* Left Side - Dynamic Visual */}
       <div className={`hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center transition-colors duration-700 bg-${currentConfig.color}-900`}>
          <div className={`absolute inset-0 opacity-30 bg-[url('https://images.unsplash.com/photo-1450778869180-41d0601e046e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1500&q=80')] bg-cover bg-center mix-blend-overlay`} />
@@ -186,11 +212,13 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialView = 'login', onLoginSucce
                           <div className={`absolute left-4 top-3.5 text-slate-400 group-focus-within:text-${currentConfig.color}-600 transition-colors`}>
                              {React.createElement(currentConfig.nameField.icon, { size: 20 })}
                           </div>
-                          <input 
-                              type="text" 
+                          <input
+                              type="text"
                               placeholder={currentConfig.nameField.placeholder}
                               className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 pl-12 pr-4 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-${currentConfig.color}-500/20 focus:border-${currentConfig.color}-500 transition-all placeholder:text-slate-400`}
                               required
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
                           />
                           <label className="absolute -top-2 left-3 bg-white px-1 text-xs font-bold text-slate-500">{currentConfig.nameField.label}</label>
                         </div>
@@ -245,23 +273,26 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialView = 'login', onLoginSucce
 
                 <div className="relative group">
                     <Mail className={`absolute left-4 top-3.5 text-slate-400 group-focus-within:text-${currentConfig.color}-600 transition-colors`} size={20} />
-                    <input 
-                        type="email" 
+                    <input
+                        type="email"
                         placeholder="Email Address"
                         className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 pl-12 pr-4 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-${currentConfig.color}-500/20 focus:border-${currentConfig.color}-500 transition-all placeholder:text-slate-400`}
                         required
-                        defaultValue={isLogin ? "user@example.com" : ""}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                     />
                 </div>
 
                 <div className="relative group">
                     <Lock className={`absolute left-4 top-3.5 text-slate-400 group-focus-within:text-${currentConfig.color}-600 transition-colors`} size={20} />
-                    <input 
-                        type={showPassword ? "text" : "password"} 
+                    <input
+                        type={showPassword ? "text" : "password"}
                         placeholder="Password"
                         className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 pl-12 pr-12 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-${currentConfig.color}-500/20 focus:border-${currentConfig.color}-500 transition-all placeholder:text-slate-400`}
                         required
-                        defaultValue={isLogin ? "password123" : ""}
+                        minLength={6}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                     />
                     <button
                         type="button"
@@ -276,7 +307,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialView = 'login', onLoginSucce
 
                 {isLogin && (
                     <div className="flex justify-end">
-                        <button type="button" className={`text-sm font-bold text-${currentConfig.color}-600 hover:text-${currentConfig.color}-700 transition-colors`}>
+                        <button
+                            type="button"
+                            onClick={() => setNotice('Password reset is not available in this demo.')}
+                            className={`text-sm font-bold text-${currentConfig.color}-600 hover:text-${currentConfig.color}-700 transition-colors`}
+                        >
                             Forgot Password?
                         </button>
                     </div>
@@ -307,10 +342,18 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialView = 'login', onLoginSucce
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-4">
-                <button className="flex items-center justify-center py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors hover:border-slate-300">
+                <button
+                    type="button"
+                    onClick={() => setNotice('Google sign-in is not available in this demo.')}
+                    className="flex items-center justify-center py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors hover:border-slate-300"
+                >
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
                 </button>
-                <button className="flex items-center justify-center py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors hover:border-slate-300">
+                <button
+                    type="button"
+                    onClick={() => setNotice('Apple sign-in is not available in this demo.')}
+                    className="flex items-center justify-center py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors hover:border-slate-300"
+                >
                     <img src="https://www.svgrepo.com/show/511330/apple-173.svg" className="w-6 h-6" alt="Apple" />
                 </button>
             </div>

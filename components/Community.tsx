@@ -1,20 +1,34 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MOCK_FEED, MOCK_EVENTS, MOCK_CONNECTIONS, MOCK_PATIENTS_DETAILED, MOCK_PETS } from '../constants';
 import { Calendar, MapPin, Users, Share2, Plus, X, Filter, MessageCircle, Copy, Heart, Image as ImageIcon, Send, ThumbsUp, MoreHorizontal, CheckCircle, ShoppingBag, AlertTriangle, Info, ArrowUpRight, Clock, Camera, Sparkles, Ticket, Flame, Megaphone, Coins, Lock, ArrowRight, UserPlus, UserCheck, UserX, Trash2, PawPrint, Activity, Shield, Syringe, Tag } from 'lucide-react';
-import { Event, Post, PostType, UserRole, Connection } from '../types';
+import { Event, Post, PostType, UserRole, Connection, Comment } from '../types';
+import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 // --- SUB-COMPONENT: Create Post Widget ---
 const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void }) => {
     const [text, setText] = useState('');
     const [postType, setPostType] = useState<PostType>('GENERAL');
     const [isExpanded, setIsExpanded] = useState(false);
+    const [image, setImage] = useState<string | undefined>(undefined);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setImage(URL.createObjectURL(e.target.files[0]));
+            setIsExpanded(true);
+        }
+        e.target.value = ''; // allow re-selecting the same file
+    };
 
     const handleSubmit = () => {
-        if(!text.trim()) return;
-        onPost({ content: text, type: postType });
+        if(!text.trim() && !image) return;
+        onPost({ content: text, type: postType, image });
         setText('');
         setPostType('GENERAL');
+        setImage(undefined);
         setIsExpanded(false);
     };
 
@@ -31,7 +45,24 @@ const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void })
                         onChange={(e) => setText(e.target.value)}
                         onFocus={() => setIsExpanded(true)}
                     />
-                    
+
+                    {image && (
+                        <div className="relative mt-2 rounded-xl overflow-hidden border border-slate-100 w-fit">
+                            <img src={image} className="max-h-48 object-cover" />
+                            <button
+                                onClick={() => setImage(undefined)}
+                                className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                                title="Remove image"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Hidden file inputs for image / camera */}
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageSelect} />
+
                     {isExpanded && (
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-3 gap-4 pt-3 border-t border-slate-50 animate-in fade-in">
                             <div className="flex gap-2 overflow-x-auto scrollbar-hide max-w-full pb-1">
@@ -51,12 +82,12 @@ const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void })
                             </div>
                             <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                                 <div className="flex gap-1">
-                                    <button className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"><ImageIcon size={18} /></button>
-                                    <button className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"><Camera size={18} /></button>
+                                    <button onClick={() => fileInputRef.current?.click()} title="Add photo" className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"><ImageIcon size={18} /></button>
+                                    <button onClick={() => cameraInputRef.current?.click()} title="Take photo" className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"><Camera size={18} /></button>
                                 </div>
-                                <button 
+                                <button
                                     onClick={handleSubmit}
-                                    disabled={!text.trim()}
+                                    disabled={!text.trim() && !image}
                                     className="bg-teal-600 text-white px-6 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-teal-700 disabled:opacity-50 transition-all shadow-md shadow-teal-200"
                                 >
                                     Post
@@ -71,13 +102,66 @@ const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void })
 };
 
 // --- SUB-COMPONENT: Feed Post ---
-const FeedPost: React.FC<{ post: Post }> = ({ post }) => {
+const FeedPost: React.FC<{ post: Post; onNotify: (message: string) => void }> = ({ post, onNotify }) => {
     const [isLiked, setIsLiked] = useState(post.isLiked);
     const [likes, setLikes] = useState(post.likes);
+    const [comments, setComments] = useState<Comment[]>(post.comments);
+    const [showComments, setShowComments] = useState(false);
+    const [commentText, setCommentText] = useState('');
+    const [menuOpen, setMenuOpen] = useState(false);
 
     const toggleLike = () => {
         setIsLiked(!isLiked);
         setLikes(prev => isLiked ? prev - 1 : prev + 1);
+    };
+
+    const handleShare = async () => {
+        const shareUrl = window.location.href;
+        const shareData = {
+            title: `PawPortal — post by ${post.author.name}`,
+            text: post.content,
+            url: shareUrl,
+        };
+        try {
+            if (typeof navigator !== 'undefined' && navigator.share) {
+                await navigator.share(shareData);
+            } else if (navigator.clipboard) {
+                await navigator.clipboard.writeText(`${post.content}\n\n${shareUrl}`);
+                onNotify('Post link copied to clipboard!');
+            } else {
+                onNotify('Sharing is not supported on this browser.');
+            }
+        } catch (err) {
+            // User cancelled the native share sheet — not an error, so stay silent.
+        }
+    };
+
+    const handleCopyLink = async () => {
+        setMenuOpen(false);
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            onNotify('Link copied to clipboard!');
+        } catch {
+            onNotify('Could not copy link.');
+        }
+    };
+
+    const handleReport = () => {
+        setMenuOpen(false);
+        onNotify('Thanks — this post has been reported for review.');
+    };
+
+    const addComment = () => {
+        if (!commentText.trim()) return;
+        const newComment: Comment = {
+            id: `c-${Date.now()}`,
+            user: 'Jane Doe',
+            avatar: 'https://picsum.photos/id/64/100/100',
+            text: commentText.trim(),
+            timestamp: 'Just now',
+        };
+        setComments(prev => [...prev, newComment]);
+        setCommentText('');
     };
 
     const getRoleBadge = (role: UserRole) => {
@@ -115,7 +199,28 @@ const FeedPost: React.FC<{ post: Post }> = ({ post }) => {
                 </div>
                 <div className="flex items-center gap-2">
                     {getTypeBadge(post.type)}
-                    <button className="text-slate-300 hover:text-slate-500 p-1 rounded-full hover:bg-slate-50 transition-colors"><MoreHorizontal size={16}/></button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setMenuOpen(o => !o)}
+                            className="text-slate-300 hover:text-slate-500 p-1 rounded-full hover:bg-slate-50 transition-colors"
+                        >
+                            <MoreHorizontal size={16}/>
+                        </button>
+                        {menuOpen && (
+                            <>
+                                {/* Click-away overlay */}
+                                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                                <div className="absolute right-0 mt-1 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-20 animate-in fade-in">
+                                    <button onClick={handleCopyLink} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+                                        <Copy size={14} /> Copy link
+                                    </button>
+                                    <button onClick={handleReport} className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2">
+                                        <AlertTriangle size={14} /> Report post
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -135,7 +240,10 @@ const FeedPost: React.FC<{ post: Post }> = ({ post }) => {
                                  <p className="text-[10px] font-bold opacity-90 mb-0.5 uppercase tracking-wider">Limited Time Offer</p>
                                  {post.price && <p className="text-xl font-black text-emerald-300">PKR {post.price.toLocaleString()}</p>}
                              </div>
-                             <button className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-colors shadow-lg">
+                             <button
+                                 onClick={() => post.actionLink ? window.open(post.actionLink, '_blank', 'noopener') : onNotify('Opening deal…')}
+                                 className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-colors shadow-lg"
+                             >
                                  {post.actionLabel || 'Shop Deal'}
                              </button>
                          </div>
@@ -152,14 +260,63 @@ const FeedPost: React.FC<{ post: Post }> = ({ post }) => {
                     >
                         <Heart size={16} className={isLiked ? "fill-current" : ""} /> {likes}
                     </button>
-                    <button className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-500 transition-colors">
-                        <MessageCircle size={16} /> {post.comments.length}
+                    <button
+                        onClick={() => setShowComments(s => !s)}
+                        className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${showComments ? 'text-blue-500' : 'text-slate-500 hover:text-blue-500'}`}
+                    >
+                        <MessageCircle size={16} /> {comments.length}
                     </button>
                 </div>
-                <button className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-50 transition-colors">
+                <button
+                    onClick={handleShare}
+                    title="Share post"
+                    className="text-slate-400 hover:text-teal-600 p-1.5 rounded-full hover:bg-teal-50 transition-colors"
+                >
                      <Share2 size={16} />
                 </button>
             </div>
+
+            {/* Comments */}
+            {showComments && (
+                <div className="mt-4 ml-[3.25rem] pt-4 border-t border-slate-50 animate-in fade-in space-y-3">
+                    {comments.map(c => (
+                        <div key={c.id} className="flex gap-2.5">
+                            <img src={c.avatar} className="w-7 h-7 rounded-full object-cover border border-slate-100 flex-shrink-0" />
+                            <div className="bg-slate-50 rounded-2xl px-3 py-2 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <p className="text-xs font-bold text-slate-700">{c.user}</p>
+                                    <p className="text-[10px] text-slate-400">{c.timestamp}</p>
+                                </div>
+                                <p className="text-xs text-slate-600 leading-relaxed">{c.text}</p>
+                            </div>
+                        </div>
+                    ))}
+                    {comments.length === 0 && (
+                        <p className="text-xs text-slate-400 italic">No comments yet. Be the first!</p>
+                    )}
+
+                    {/* Add comment */}
+                    <div className="flex gap-2 items-center pt-1">
+                        <img src="https://picsum.photos/id/64/100/100" className="w-7 h-7 rounded-full object-cover border border-slate-100 flex-shrink-0" />
+                        <input
+                            type="text"
+                            value={commentText}
+                            onChange={e => setCommentText(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') addComment(); }}
+                            placeholder="Write a comment..."
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-full px-4 py-2 text-xs outline-none focus:ring-2 focus:ring-teal-500"
+                        />
+                        <button
+                            onClick={addComment}
+                            disabled={!commentText.trim()}
+                            className="p-2 bg-teal-600 text-white rounded-full hover:bg-teal-700 disabled:opacity-40 transition-colors flex-shrink-0"
+                            title="Send comment"
+                        >
+                            <Send size={14} />
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -716,7 +873,8 @@ const CreateGroupModal = ({ onClose, onCreate, balance }: { onClose: () => void,
 
 // --- Main Component ---
 const Community: React.FC = () => {
-  const [posts, setPosts] = useState<Post[]>(MOCK_FEED);
+  const { user } = useAuth();
+  const [posts, setPosts] = useState<Post[]>([]);
   const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
   const [groups, setGroups] = useState([
        { id: 'g1', name: 'Golden Retrievers PK', members: '1.2k' },
@@ -727,6 +885,25 @@ const Community: React.FC = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [pawPoints, setPawPoints] = useState(2450); // Mock Wallet Balance
+  const [joinedGroups, setJoinedGroups] = useState<Set<string>>(new Set());
+
+  const toggleJoinGroup = (id: string, name: string) => {
+      setJoinedGroups(prev => {
+          const next = new Set(prev);
+          if (next.has(id)) { next.delete(id); notify(`Left "${name}".`); }
+          else { next.add(id); notify(`Joined "${name}"!`); }
+          return next;
+      });
+  };
+
+  const handleCopyInvite = async () => {
+      try {
+          await navigator.clipboard.writeText(window.location.origin);
+          notify('Invite link copied to clipboard!');
+      } catch {
+          notify('Could not copy invite link.');
+      }
+  };
   
   // Connections State
   const [connections, setConnections] = useState<Connection[]>(MOCK_CONNECTIONS);
@@ -760,17 +937,79 @@ const Community: React.FC = () => {
       return null;
   };
 
+  // Lightweight toast helper for transient feedback (share/copy/etc.)
+  const notify = (message: string) => {
+      setToast({ message });
+      setTimeout(() => setToast(current => (current?.message === message ? null : current)), 3000);
+  };
+
+  // Load shared community posts from the backend once we have a logged-in user.
+  // If the global feed is empty, seed it once from MOCK_FEED so the first user
+  // doesn't land on an empty page.
+  useEffect(() => {
+      if (!user) return;
+      let cancelled = false;
+
+      (async () => {
+          try {
+              let list = await api.list<Post>('global', 'posts');
+
+              if (list.length === 0) {
+                  // Seed the shared feed once. Strip client-only ids so the server
+                  // assigns its own, then use the persisted objects in state.
+                  const seeded: Post[] = [];
+                  for (const item of MOCK_FEED) {
+                      const { id, ...rest } = item;
+                      try {
+                          seeded.push(await api.create<Post>('global', 'posts', rest));
+                      } catch {
+                          // If seeding a single item fails, keep going.
+                      }
+                  }
+                  list = seeded;
+              }
+
+              if (!cancelled) setPosts(list);
+          } catch {
+              // Backend unreachable — fall back to mock so the UI still renders.
+              if (!cancelled) setPosts(MOCK_FEED);
+          }
+      })();
+
+      return () => { cancelled = true; };
+  }, [user]);
+
   const handleNewPost = (newPost: Partial<Post>) => {
+      const author = {
+          id: user?.id || 'me',
+          name: user?.name || 'Anonymous',
+          role: user?.role || UserRole.OWNER,
+          avatar: user?.avatar || 'https://picsum.photos/id/64/100/100',
+      };
       const post: Post = {
           id: `p-${Date.now()}`,
-          author: { id: 'me', name: 'Jane Doe', role: UserRole.OWNER, avatar: 'https://picsum.photos/id/64/100/100' },
+          author,
           type: newPost.type || 'GENERAL',
           content: newPost.content || '',
+          image: newPost.image,
           timestamp: 'Just now',
           likes: 0,
           comments: []
       };
-      setPosts([post, ...posts]);
+
+      // Optimistic: show immediately, then persist in the background and swap
+      // in the server-backed object (with its real id) on success.
+      setPosts(prev => [post, ...prev]);
+      notify('Your post is live!');
+
+      const { id, ...payload } = post;
+      api.create<Post>('global', 'posts', payload)
+          .then(saved => {
+              setPosts(prev => prev.map(p => (p.id === post.id ? saved : p)));
+          })
+          .catch(() => {
+              notify('Could not save your post. It may disappear on refresh.');
+          });
   };
 
   const handleCreateEvent = (newEvent: Event) => {
@@ -942,7 +1181,7 @@ const Community: React.FC = () => {
                
                <div className="space-y-6">
                    {filteredPosts.map(post => (
-                       <FeedPost key={post.id} post={post} />
+                       <FeedPost key={post.id} post={post} onNotify={notify} />
                    ))}
                    {filteredPosts.length === 0 && (
                        <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
@@ -962,7 +1201,7 @@ const Community: React.FC = () => {
                    <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
                    <h3 className="font-bold text-lg mb-2 relative z-10">Invite Friends</h3>
                    <p className="text-xs text-teal-100 mb-4 relative z-10">Earn PawPoints for every friend who joins the pack!</p>
-                   <button className="w-full py-3 bg-white/20 text-white border border-white/30 hover:bg-white/30 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors relative z-10">
+                   <button onClick={handleCopyInvite} className="w-full py-3 bg-white/20 text-white border border-white/30 hover:bg-white/30 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors relative z-10">
                         <Copy size={16} /> Copy Invite Link
                    </button>
                </div>
@@ -974,7 +1213,7 @@ const Community: React.FC = () => {
                            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2">
                                <Calendar size={14} /> Upcoming Events
                            </h3>
-                           <button className="text-teal-600 text-xs font-bold hover:underline">View All</button>
+                           <button onClick={() => setActiveMobileTab('EVENTS')} className="text-teal-600 text-xs font-bold hover:underline">View All</button>
                        </div>
                        <div className="space-y-3">
                            {events.slice(0,3).map(e => <EventMiniCard key={e.id} event={e} />)}
@@ -1001,8 +1240,10 @@ const Community: React.FC = () => {
                            </div>
                        </div>
                        <div className="space-y-4">
-                           {groups.map((g, i) => (
-                               <div key={i} className="flex items-center justify-between group cursor-pointer">
+                           {groups.map((g, i) => {
+                               const joined = joinedGroups.has(g.id);
+                               return (
+                               <div key={g.id ?? i} className="flex items-center justify-between group">
                                    <div className="flex items-center gap-3">
                                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-400 text-xs group-hover:bg-teal-100 group-hover:text-teal-600 transition-colors">{g.name[0]}</div>
                                        <div>
@@ -1010,11 +1251,16 @@ const Community: React.FC = () => {
                                            <p className="text-[10px] text-slate-400">{g.members} Members</p>
                                        </div>
                                    </div>
-                                   <button className="p-1.5 bg-slate-50 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-lg transition-colors">
-                                       <Plus size={14} />
+                                   <button
+                                       onClick={() => toggleJoinGroup(g.id, g.name)}
+                                       title={joined ? 'Leave group' : 'Join group'}
+                                       className={`p-1.5 rounded-lg transition-colors ${joined ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-slate-50 hover:bg-teal-50 text-slate-400 hover:text-teal-600'}`}
+                                   >
+                                       {joined ? <CheckCircle size={14} /> : <Plus size={14} />}
                                    </button>
                                </div>
-                           ))}
+                               );
+                           })}
                        </div>
                        <button 
                             onClick={() => setShowCreateGroupModal(true)}

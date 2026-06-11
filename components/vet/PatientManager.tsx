@@ -49,6 +49,13 @@ const PatientManager: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPolishing, setIsPolishing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+
+  // Transient toast feedback
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
   
   // New Record Form State
   const [newRecord, setNewRecord] = useState({
@@ -470,7 +477,7 @@ const PatientManager: React.FC = () => {
                                         <p className="text-xs text-slate-500">IDEXX Laboratories • Oct 15, 2023</p>
                                     </div>
                                 </div>
-                                <button className="w-full sm:w-auto px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">View PDF</button>
+                                <button onClick={() => showToast('Opening Comprehensive Metabolic Panel PDF...')} className="w-full sm:w-auto px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">View PDF</button>
                             </div>
                              <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -480,9 +487,9 @@ const PatientManager: React.FC = () => {
                                         <p className="text-xs text-slate-500">In-House • Sep 01, 2023</p>
                                     </div>
                                 </div>
-                                <button className="w-full sm:w-auto px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">View PDF</button>
+                                <button onClick={() => showToast('Opening Urinalysis PDF...')} className="w-full sm:w-auto px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">View PDF</button>
                             </div>
-                            <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-sm hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
+                            <button onClick={() => showToast(`Lab work requested for ${selectedPatient.name}`)} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-sm hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
                                 + Request New Lab Work
                             </button>
                         </div>
@@ -498,7 +505,7 @@ const PatientManager: React.FC = () => {
                             <p className="text-slate-500 text-sm text-center max-w-xs mb-6">
                                 Connect with the owner for a remote follow-up. Secure and HIPAA compliant.
                             </p>
-                            <button className="px-6 py-3 bg-teal-600 text-white rounded-xl font-bold shadow-lg hover:bg-teal-700 flex items-center gap-2">
+                            <button onClick={() => showToast(`Connecting video room with ${selectedPatient.owner.name}...`)} className="px-6 py-3 bg-teal-600 text-white rounded-xl font-bold shadow-lg hover:bg-teal-700 flex items-center gap-2">
                                 <Video size={18} /> Launch Meeting Room
                             </button>
                         </div>
@@ -661,6 +668,13 @@ const PatientManager: React.FC = () => {
                       </button>
                   </div>
               </div>
+          </div>
+      )}
+
+      {/* Transient Toast */}
+      {toast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-sm font-bold animate-in fade-in slide-in-from-bottom-4">
+              <CheckCircle size={16} className="text-emerald-400" /> {toast}
           </div>
       )}
     </div>

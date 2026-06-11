@@ -185,7 +185,7 @@ const BookAppointmentModal = ({
 };
 
 // --- MODAL: Appointment Details ---
-const AppointmentDetailsModal = ({ appt, onClose, onUpdateStatus, onDelete }: { appt: Appointment, onClose: () => void, onUpdateStatus: (status: any) => void, onDelete: () => void }) => {
+const AppointmentDetailsModal = ({ appt, onClose, onUpdateStatus, onDelete, onReschedule }: { appt: Appointment, onClose: () => void, onUpdateStatus: (status: any) => void, onDelete: () => void, onReschedule: () => void }) => {
     const patient = MOCK_PATIENTS_DETAILED.find(p => p.id === appt.patientId);
     const typeConfig = APPOINTMENT_TYPES.find(t => t.id === appt.type) || APPOINTMENT_TYPES[0];
 
@@ -231,7 +231,7 @@ const AppointmentDetailsModal = ({ appt, onClose, onUpdateStatus, onDelete }: { 
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                             <div className="flex justify-between items-center mb-4">
                                 <h4 className="text-xs font-bold text-slate-400 uppercase">Owner Information</h4>
-                                <button className="p-1.5 bg-white rounded-lg shadow-sm text-slate-400 hover:text-blue-500"><Phone size={14}/></button>
+                                <a href={`tel:${patient.owner.phone}`} className="p-1.5 bg-white rounded-lg shadow-sm text-slate-400 hover:text-blue-500 inline-flex"><Phone size={14}/></a>
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center font-bold text-slate-500 border border-slate-200">
@@ -273,7 +273,7 @@ const AppointmentDetailsModal = ({ appt, onClose, onUpdateStatus, onDelete }: { 
                     )}
                     
                     <div className="flex gap-3">
-                        <button className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100">Reschedule</button>
+                        <button onClick={onReschedule} className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100">Reschedule</button>
                         <button onClick={onDelete} className="flex-1 py-3 bg-white border border-slate-200 text-red-500 font-bold rounded-xl hover:bg-red-50">Cancel</button>
                     </div>
                 </div>
@@ -384,6 +384,17 @@ const ScheduleManager: React.FC = () => {
         setIsBookModalOpen(true);
     };
 
+    const handleReschedule = (appt: Appointment) => {
+        // Remove the existing appointment and reopen the booking flow pre-filled
+        const patient = MOCK_PATIENTS_DETAILED.find(p => p.id === appt.patientId);
+        setAppointments(prev => prev.filter(a => a.id !== appt.id));
+        setSelectedAppointment(null);
+        setSelectedSlot({ time: appt.time, date: new Date(appt.date) });
+        setPreSelectedPatient(patient || null);
+        setPreFilledNotes(appt.notes || '');
+        setIsBookModalOpen(true);
+    };
+
     // --- RENDER ---
     return (
         <div className="h-full flex flex-col lg:flex-row gap-6 bg-slate-50/50 animate-fade-in">
@@ -408,6 +419,7 @@ const ScheduleManager: React.FC = () => {
                     onClose={() => setSelectedAppointment(null)}
                     onUpdateStatus={(status) => handleUpdateStatus(selectedAppointment.id, status)}
                     onDelete={() => handleDeleteAppointment(selectedAppointment.id)}
+                    onReschedule={() => handleReschedule(selectedAppointment)}
                 />
             )}
 

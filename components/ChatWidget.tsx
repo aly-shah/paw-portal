@@ -19,8 +19,14 @@ const ChatWidget: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [unreadCount, setUnreadCount] = useState(1);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [callNotice, setCallNotice] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const startCall = (kind: 'voice' | 'video') => {
+    setCallNotice(`Starting ${kind} call with PawPortal Support…`);
+    setTimeout(() => setCallNotice(''), 2500);
+  };
 
   // Mock Conversation Starter
   const [messages, setMessages] = useState<Message[]>([
@@ -148,12 +154,19 @@ const ChatWidget: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-1 text-blue-600">
-              <button className="p-2 hover:bg-blue-50 rounded-full transition-colors"><Phone size={18} /></button>
-              <button className="p-2 hover:bg-blue-50 rounded-full transition-colors"><Video size={18} /></button>
+              <button onClick={() => startCall('voice')} className="p-2 hover:bg-blue-50 rounded-full transition-colors"><Phone size={18} /></button>
+              <button onClick={() => startCall('video')} className="p-2 hover:bg-blue-50 rounded-full transition-colors"><Video size={18} /></button>
               <button onClick={() => setIsMinimized(true)} className="p-2 hover:bg-blue-50 rounded-full transition-colors"><Minus size={18} /></button>
               <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-blue-50 rounded-full transition-colors"><X size={18} /></button>
             </div>
           </div>
+
+          {/* Call notice */}
+          {callNotice && (
+            <div className="bg-blue-50 text-blue-700 text-xs font-medium px-4 py-2 border-b border-blue-100 animate-in fade-in">
+              {callNotice}
+            </div>
+          )}
 
           {/* Messages Area */}
           <div className="flex-1 bg-white overflow-y-auto p-4 space-y-4">

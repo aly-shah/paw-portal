@@ -137,21 +137,24 @@ interface WorkflowActions {
 }
 
 // --- PATIENT PROFILE MODAL ---
-const PatientProfileModal = ({ 
-    patientName, 
-    ownerName, 
-    onClose, 
-    context, 
-    actions, 
-    availableRooms 
-}: { 
-    patientName: string, 
-    ownerName: string, 
+const PatientProfileModal = ({
+    patientName,
+    ownerName,
+    onClose,
+    context,
+    actions,
+    availableRooms,
+    onNotify
+}: {
+    patientName: string,
+    ownerName: string,
     onClose: () => void,
     context?: PatientContext,
     actions?: WorkflowActions,
-    availableRooms?: ClinicRoom[]
+    availableRooms?: ClinicRoom[],
+    onNotify?: (message: string) => void
 }) => {
+    const notify = onNotify || (() => {});
     const [selectedRoomId, setSelectedRoomId] = useState(availableRooms && availableRooms.length > 0 ? availableRooms[0].id : '');
 
     // Lookup mock details or generate placeholder
@@ -211,10 +214,16 @@ const PatientProfileModal = ({
                             </p>
                         </div>
                         <div className="flex gap-2">
-                            <button className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-50 flex items-center gap-2">
+                            <button
+                                onClick={() => { window.print(); notify('Preparing patient label for printing...'); }}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-50 flex items-center gap-2"
+                            >
                                 <Printer size={16} /> Label
                             </button>
-                            <button className="px-4 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 flex items-center gap-2 shadow-lg">
+                            <button
+                                onClick={() => notify('Profile editing is not available in this demo.')}
+                                className="px-4 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 flex items-center gap-2 shadow-lg"
+                            >
                                 <Edit3 size={16} /> Edit Profile
                             </button>
                         </div>
@@ -282,7 +291,10 @@ const PatientProfileModal = ({
 
                                 {context.status === 'ADMITTED' && actions && (
                                     <>
-                                        <button className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50">
+                                        <button
+                                            onClick={() => notify('Visit note saved to patient record.')}
+                                            className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50"
+                                        >
                                             Add Note
                                         </button>
                                         <button 
@@ -423,7 +435,10 @@ const PatientProfileModal = ({
                                 )}
                             </div>
                             <div className="p-2">
-                                <button className="w-full py-2 bg-white border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm">
+                                <button
+                                    onClick={() => notify('Full medical records are not available in this demo.')}
+                                    className="w-full py-2 bg-white border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm"
+                                >
                                     View Full Records
                                 </button>
                             </div>
@@ -534,6 +549,18 @@ const AddInventoryModal = ({ onClose, onSave }: { onClose: () => void, onSave: (
         setFormData(prev => ({ ...prev, tags: prev.tags?.filter(t => t !== tag) }));
     };
 
+    // Simple markdown-style formatting applied to the description field
+    const applyFormat = (format: 'bold' | 'italic' | 'list') => {
+        setFormData(prev => {
+            const current = prev.description || '';
+            let next = current;
+            if (format === 'bold') next = `${current}**bold text**`;
+            else if (format === 'italic') next = `${current}*italic text*`;
+            else if (format === 'list') next = current ? `${current}\n- ` : '- ';
+            return { ...prev, description: next };
+        });
+    };
+
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
             <div className="bg-white w-full max-w-5xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in-95">
@@ -608,9 +635,9 @@ const AddInventoryModal = ({ onClose, onSave }: { onClose: () => void, onSave: (
                                     <div className="flex justify-between items-end mb-2">
                                         <label className="block text-xs font-bold text-slate-500 uppercase">Description / Dosage Info</label>
                                         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-                                            <button className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors"><Bold size={14} /></button>
-                                            <button className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors"><Italic size={14} /></button>
-                                            <button className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors"><ListIcon size={14} /></button>
+                                            <button type="button" onClick={() => applyFormat('bold')} className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors"><Bold size={14} /></button>
+                                            <button type="button" onClick={() => applyFormat('italic')} className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors"><Italic size={14} /></button>
+                                            <button type="button" onClick={() => applyFormat('list')} className="p-1.5 hover:bg-white rounded text-slate-500 hover:text-slate-800 transition-colors"><ListIcon size={14} /></button>
                                         </div>
                                     </div>
                                     <textarea 
@@ -1074,6 +1101,14 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
 
     // Search State
     const [searchQuery, setSearchQuery] = useState('');
+    const [queueSearch, setQueueSearch] = useState('');
+
+    // Transient toast feedback (no backend)
+    const [toast, setToast] = useState<string | null>(null);
+    const showToast = (message: string) => {
+        setToast(message);
+        setTimeout(() => setToast(null), 2500);
+    };
 
     useEffect(() => {
         if (initialTab === 'Inventory') {
@@ -1290,8 +1325,9 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
 
     // --- Sub-Components ---
     const InventoryManagementContent = () => {
-        const filteredInventory = inventory.filter(item => 
-            item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
+        const filteredInventory = inventory.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.sku.toLowerCase().includes(searchQuery.toLowerCase())
         );
 
@@ -1398,8 +1434,36 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
                                                 {item.stock <= item.minLevel ? 'Low Stock' : 'In Stock'}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-right">
-                                            <button className="p-2 hover:bg-white hover:shadow-md rounded-lg text-slate-400 hover:text-slate-600 transition-all"><MoreVertical size={16} /></button>
+                                        <td className="p-4 text-right relative">
+                                            <button
+                                                onClick={() => setOpenRowMenu(openRowMenu === item.id ? null : item.id)}
+                                                className="p-2 hover:bg-white hover:shadow-md rounded-lg text-slate-400 hover:text-slate-600 transition-all"
+                                            >
+                                                <MoreVertical size={16} />
+                                            </button>
+                                            {openRowMenu === item.id && (
+                                                <div className="absolute right-4 top-12 w-44 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-30 animate-in fade-in zoom-in-95 origin-top-right text-left">
+                                                    <button
+                                                        onClick={() => { updateStock(item.id, 10); setOpenRowMenu(null); showToast(`Restocked ${item.name} (+10 ${item.unit}).`); }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                                    >
+                                                        <Plus size={14} className="text-emerald-500" /> Restock (+10)
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { navigator.clipboard?.writeText(item.sku); setOpenRowMenu(null); showToast(`Copied SKU ${item.sku}.`); }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                                    >
+                                                        <Barcode size={14} className="text-blue-500" /> Copy SKU
+                                                    </button>
+                                                    <div className="h-px bg-slate-100"></div>
+                                                    <button
+                                                        onClick={() => { setInventory(prev => prev.filter(i => i.id !== item.id)); setOpenRowMenu(null); showToast(`Removed ${item.name}.`); }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                    >
+                                                        <Trash2 size={14} /> Delete Item
+                                                    </button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -1614,6 +1678,12 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
     const lowStockItems = inventory.filter(i => i.stock <= i.minLevel);
     const activeStaff = staff.filter(s => s.status !== 'Off Duty');
 
+    const ToastNotice = () => toast ? (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 bg-slate-900 text-white text-sm font-bold rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 flex items-center gap-2">
+            <CheckCircle size={16} className="text-emerald-400" /> {toast}
+        </div>
+    ) : null;
+
     // --- MAIN RENDER ---
     if (view === 'INVENTORY') {
         return (
@@ -1633,12 +1703,14 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
                 <InventoryManagementContent />
                 {isInventoryModalOpen && <AddInventoryModal onClose={() => setIsInventoryModalOpen(false)} onSave={handleAddItem} />}
                 {isImportModalOpen && <InventoryImportModal onClose={() => setIsImportModalOpen(false)} onImportComplete={handleImportComplete} />}
+                <ToastNotice />
             </div>
         );
     }
 
     return (
         <div className="flex flex-col h-[calc(100vh-100px)] gap-6 animate-fade-in">
+            <ToastNotice />
             <RoomActionModal />
             {isStaffModalOpen && <StaffManagementModal />}
             {billingSession && <BillingModal />}
@@ -1649,6 +1721,7 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
                     ownerName={viewingPatient.owner} 
                     onClose={() => setViewingPatient(null)}
                     context={viewingPatient.context}
+                    onNotify={showToast}
                     availableRooms={rooms.filter(r => r.status === 'AVAILABLE')}
                     actions={{
                         onAdmit: (roomId) => {
@@ -1765,11 +1838,20 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
                     <div className="p-2">
                         <div className="relative mb-2">
                             <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                            <input type="text" placeholder="Find patient..." className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <input
+                                type="text"
+                                placeholder="Find patient..."
+                                value={queueSearch}
+                                onChange={(e) => setQueueSearch(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                        {queue.map(item => (
+                        {queue.filter(item =>
+                            item.patientName.toLowerCase().includes(queueSearch.toLowerCase()) ||
+                            item.ownerName.toLowerCase().includes(queueSearch.toLowerCase())
+                        ).map(item => (
                             <div key={item.id} className="p-3 bg-white border border-slate-100 rounded-xl hover:border-blue-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing group relative">
                                 <div 
                                     className="absolute inset-0 z-0" 

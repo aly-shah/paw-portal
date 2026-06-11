@@ -21,6 +21,19 @@ const AdoptionCenter: React.FC = () => {
     });
     const [selectedPetForListing, setSelectedPetForListing] = useState<string>('');
 
+    // Saved listings + transient toast
+    const [savedListings, setSavedListings] = useState<string[]>([]);
+    const [toast, setToast] = useState<string | null>(null);
+
+    const showToast = (msg: string) => {
+        setToast(msg);
+        setTimeout(() => setToast(null), 2500);
+    };
+
+    const toggleSaved = (id: string) => {
+        setSavedListings(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
+    };
+
     const filteredListings = listings.filter(l => {
         const matchesType = filterType === 'ALL' || l.type === filterType;
         const matchesSearch = l.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -129,8 +142,10 @@ const AdoptionCenter: React.FC = () => {
                                     <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur text-white px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
                                         <MapPin size={12} /> {listing.owner.location}
                                     </div>
-                                    <button className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur rounded-full hover:bg-white text-slate-400 hover:text-rose-500 transition-colors">
-                                        <Heart size={16} />
+                                    <button
+                                        onClick={() => toggleSaved(listing.id)}
+                                        className={`absolute top-3 right-3 p-2 bg-white/80 backdrop-blur rounded-full hover:bg-white transition-colors ${savedListings.includes(listing.id) ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                                        <Heart size={16} fill={savedListings.includes(listing.id) ? 'currentColor' : 'none'} />
                                     </button>
                                 </div>
                                 
@@ -157,7 +172,9 @@ const AdoptionCenter: React.FC = () => {
                                             <img src={listing.owner.avatar} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
                                             <span className="text-xs font-bold text-slate-700">{listing.owner.name}</span>
                                         </div>
-                                        <button className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-2">
+                                        <button
+                                            onClick={() => showToast(`Message request sent to ${listing.owner.name}.`)}
+                                            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-2">
                                             Contact <MessageCircle size={14} />
                                         </button>
                                     </div>
@@ -328,6 +345,14 @@ const AdoptionCenter: React.FC = () => {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-2xl z-[60] animate-in slide-in-from-bottom-5 fade-in flex items-center gap-3">
+                    <CheckCircle size={20} className="text-emerald-400" />
+                    <p className="text-sm font-bold">{toast}</p>
                 </div>
             )}
         </div>

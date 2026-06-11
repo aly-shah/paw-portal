@@ -134,7 +134,11 @@ const HealthHub: React.FC = () => {
                       </p>
                     </div>
                     {r.relatedProductId && (
-                      <button title="Reorder" className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg">
+                      <button
+                        onClick={() => toast(`Reorder added to cart for "${r.title}"`, 'success')}
+                        title="Reorder"
+                        className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg"
+                      >
                         <ShoppingBag size={16} />
                       </button>
                     )}

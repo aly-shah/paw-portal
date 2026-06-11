@@ -68,8 +68,8 @@ const MarketingFooter: React.FC = () => {
         <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-[var(--ed-line)] pt-8 sm:flex-row sm:items-center">
           <p className="text-[12px] text-[var(--ed-muted)]">© {new Date().getFullYear()} PawPortal Inc.</p>
           <div className="flex items-center gap-6 text-[12px] text-[var(--ed-ink-2)]">
-            <a href="#" className="link-under">Privacy</a>
-            <a href="#" className="link-under">Terms</a>
+            <Link to="/" className="link-under">Privacy</Link>
+            <Link to="/" className="link-under">Terms</Link>
             <button onClick={() => nav('/admin')} className="link-under">Admin</button>
           </div>
         </div>

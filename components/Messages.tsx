@@ -90,6 +90,7 @@ const ShareMenu = ({ title, text, buttonLabel, className, icon }: { title: strin
 const CallOverlay = ({ user, type, onClose }: { user: any, type: 'voice' | 'video', onClose: () => void }) => {
     const [callStatus, setCallStatus] = useState('Connecting...');
     const [isMuted, setIsMuted] = useState(false);
+    const [isCameraOff, setIsCameraOff] = useState(type === 'voice');
 
     useEffect(() => {
         const timer = setTimeout(() => setCallStatus('Ringing...'), 1500);
@@ -131,8 +132,11 @@ const CallOverlay = ({ user, type, onClose }: { user: any, type: 'voice' | 'vide
                         <Phone size={32} className="rotate-135" />
                     </button>
 
-                    <button className="p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all">
-                        {type === 'video' ? <VideoOff size={24} /> : <Video size={24} />}
+                    <button
+                        onClick={() => setIsCameraOff(prev => !prev)}
+                        className={`p-4 rounded-full transition-all ${isCameraOff ? 'bg-white text-slate-900' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                    >
+                        {isCameraOff ? <VideoOff size={24} /> : <Video size={24} />}
                     </button>
                 </div>
             </div>
@@ -151,6 +155,20 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
   
   // Mobile View State: Default to false (List View) unless deep linked
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Chat customization (local, demo-only)
+  const THEME_COLORS = ['bg-teal-500', 'bg-blue-500', 'bg-purple-500', 'bg-rose-500', 'bg-amber-500'];
+  const QUICK_EMOJIS = ['👍', '🐾', '❤️', '😂', '🎉'];
+  const [themeIndex, setThemeIndex] = useState(0);
+  const [emojiIndex, setEmojiIndex] = useState(0);
+  const [showMedia, setShowMedia] = useState(true);
+  const [showPetActions, setShowPetActions] = useState(true);
+
+  const showToast = (msg: string) => {
+      setToast(msg);
+      setTimeout(() => setToast(null), 2500);
+  };
 
   const activeChat = conversations.find(c => c.id === activeConversationId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -248,7 +266,14 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
 
   return (
     <div className="flex h-[calc(100vh-100px)] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in relative">
-      
+
+      {/* Transient Toast */}
+      {toast && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[80] bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+              {toast}
+          </div>
+      )}
+
       {/* Call Overlay */}
       {activeCall && (
           <CallOverlay 
@@ -421,13 +446,13 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
                   {/* Footer Input */}
                   <div className="p-3 bg-white border-t border-slate-100 flex items-end gap-2 shrink-0 pb-safe">
                       <div className="hidden md:flex gap-1 pb-2">
-                          <button className="p-2 text-teal-600 hover:bg-slate-50 rounded-full transition-colors"><Plus size={20} /></button>
-                          <button className="p-2 text-teal-600 hover:bg-slate-50 rounded-full transition-colors"><ImageIcon size={20} /></button>
-                          <button className="p-2 text-teal-600 hover:bg-slate-50 rounded-full transition-colors"><Mic size={20} /></button>
+                          <button onClick={() => showToast('Attachments are not available in this demo.')} className="p-2 text-teal-600 hover:bg-slate-50 rounded-full transition-colors"><Plus size={20} /></button>
+                          <button onClick={() => showToast('Photo sharing is not available in this demo.')} className="p-2 text-teal-600 hover:bg-slate-50 rounded-full transition-colors"><ImageIcon size={20} /></button>
+                          <button onClick={() => showToast('Voice messages are not available in this demo.')} className="p-2 text-teal-600 hover:bg-slate-50 rounded-full transition-colors"><Mic size={20} /></button>
                       </div>
-                      
+
                       {/* Mobile Plus Button */}
-                      <button className="md:hidden p-2 mb-1.5 text-teal-600 bg-slate-50 rounded-full">
+                      <button onClick={() => showToast('Attachments are not available in this demo.')} className="md:hidden p-2 mb-1.5 text-teal-600 bg-slate-50 rounded-full">
                           <Plus size={20} />
                       </button>
 
@@ -440,7 +465,7 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
                             placeholder="Type a message..." 
                             className="flex-1 bg-transparent border-none outline-none text-sm py-1 text-slate-800 placeholder:text-slate-500 min-w-0"
                           />
-                          <button className="p-1 text-slate-400 hover:text-amber-500 transition-colors hidden sm:block"><Smile size={20} /></button>
+                          <button onClick={() => setInput(prev => prev + '🐾')} className="p-1 text-slate-400 hover:text-amber-500 transition-colors hidden sm:block"><Smile size={20} /></button>
                       </div>
                       
                       <button 
@@ -477,13 +502,13 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
                   </span>
                   
                   <div className="flex gap-4 mt-6 w-full">
-                      <button className="flex-1 py-2 flex flex-col items-center gap-1 hover:bg-slate-50 rounded-xl transition-colors group">
+                      <button onClick={() => showToast(`Viewing ${activeChat.user.name}'s profile is not available in this demo.`)} className="flex-1 py-2 flex flex-col items-center gap-1 hover:bg-slate-50 rounded-xl transition-colors group">
                            <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-teal-100 transition-colors">
                                <Info size={16} className="text-slate-600 group-hover:text-teal-600" />
                            </div>
                            <span className="text-[10px] font-bold text-slate-500">Profile</span>
                       </button>
-                      <button className="flex-1 py-2 flex flex-col items-center gap-1 hover:bg-slate-50 rounded-xl transition-colors group">
+                      <button onClick={() => showToast('In-conversation search is not available in this demo.')} className="flex-1 py-2 flex flex-col items-center gap-1 hover:bg-slate-50 rounded-xl transition-colors group">
                            <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-teal-100 transition-colors">
                                <Search size={16} className="text-slate-600 group-hover:text-teal-600" />
                            </div>
@@ -495,35 +520,38 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                    {/* Customize Chat */}
                    <div className="py-2">
-                       <button className="w-full flex justify-between items-center py-3 px-2 hover:bg-slate-50 rounded-lg text-sm font-bold text-slate-700 group">
+                       <button onClick={() => setThemeIndex(prev => (prev + 1) % THEME_COLORS.length)} className="w-full flex justify-between items-center py-3 px-2 hover:bg-slate-50 rounded-lg text-sm font-bold text-slate-700 group">
                            Change Theme
-                           <div className="w-4 h-4 rounded-full bg-teal-500 shadow-sm group-hover:scale-110 transition-transform"></div>
+                           <div className={`w-4 h-4 rounded-full shadow-sm group-hover:scale-110 transition-transform ${THEME_COLORS[themeIndex]}`}></div>
                        </button>
-                       <button className="w-full flex justify-between items-center py-3 px-2 hover:bg-slate-50 rounded-lg text-sm font-bold text-slate-700">
+                       <button onClick={() => setEmojiIndex(prev => (prev + 1) % QUICK_EMOJIS.length)} className="w-full flex justify-between items-center py-3 px-2 hover:bg-slate-50 rounded-lg text-sm font-bold text-slate-700">
                            Change Emoji
-                           <span>👍</span>
+                           <span>{QUICK_EMOJIS[emojiIndex]}</span>
                        </button>
                    </div>
 
                    {/* Media & Files */}
                    <div>
-                       <button className="w-full flex justify-between items-center py-2 text-xs font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600">
-                           Media & Files <ChevronRight size={14} />
+                       <button onClick={() => setShowMedia(prev => !prev)} className="w-full flex justify-between items-center py-2 text-xs font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600">
+                           Media & Files <ChevronRight size={14} className={`transition-transform ${showMedia ? 'rotate-90' : ''}`} />
                        </button>
-                       <div className="grid grid-cols-3 gap-2 mt-2">
-                           {SHARED_MEDIA.map((url, i) => (
-                               <img key={i} src={url} className="w-full h-20 object-cover rounded-lg hover:opacity-90 cursor-pointer" />
-                           ))}
-                       </div>
+                       {showMedia && (
+                           <div className="grid grid-cols-3 gap-2 mt-2">
+                               {SHARED_MEDIA.map((url, i) => (
+                                   <img key={i} src={url} className="w-full h-20 object-cover rounded-lg hover:opacity-90 cursor-pointer" />
+                               ))}
+                           </div>
+                       )}
                    </div>
 
                    {/* Pet Specific Actions */}
                    <div>
-                        <button className="w-full flex justify-between items-center py-2 text-xs font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600">
-                           Pet Actions <ChevronRight size={14} />
+                        <button onClick={() => setShowPetActions(prev => !prev)} className="w-full flex justify-between items-center py-2 text-xs font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600">
+                           Pet Actions <ChevronRight size={14} className={`transition-transform ${showPetActions ? 'rotate-90' : ''}`} />
                         </button>
+                        {showPetActions && (
                         <div className="space-y-2 mt-2">
-                            <button className="w-full flex items-center gap-3 p-3 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors">
+                            <button onClick={() => showToast('Lab report sharing is not available in this demo.')} className="w-full flex items-center gap-3 p-3 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors">
                                 <FileText size={16} /> Share Lab Report
                             </button>
                              <ShareMenu 
@@ -535,6 +563,7 @@ const Messages: React.FC<MessagesProps> = ({ initialContext }) => {
                                  icon={<Paperclip size={16} />}
                              />
                         </div>
+                        )}
                    </div>
               </div>
           </div>

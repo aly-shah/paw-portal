@@ -86,7 +86,15 @@ const SOURCE_STATS = [
 
 const ProductDetailModal = ({ product, onClose, onUpdate }: { product: GlobalProduct, onClose: () => void, onUpdate: (p: GlobalProduct) => void }) => {
     const [status, setStatus] = useState(product.approvalStatus);
-    
+    const [isEditing, setIsEditing] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [editPrice, setEditPrice] = useState(product.price);
+    const [editStock, setEditStock] = useState(product.stock);
+
+    const handleSaveEdit = () => {
+        onUpdate({ ...product, price: editPrice, stock: editStock });
+    };
+
     const handleApprove = () => {
         const updated = { ...product, approvalStatus: 'APPROVED' as ApprovalStatus, status: 'ACTIVE' as const };
         onUpdate(updated);
@@ -164,14 +172,32 @@ const ProductDetailModal = ({ product, onClose, onUpdate }: { product: GlobalPro
                         <div className="p-4 rounded-xl border border-slate-200 bg-white">
                             <p className="text-xs font-bold text-slate-400 uppercase mb-1">Pricing</p>
                             <div className="flex items-end gap-2">
-                                <span className="text-xl font-black text-slate-800">PKR {product.price.toLocaleString()}</span>
+                                {isEditing ? (
+                                    <input
+                                        type="number"
+                                        value={editPrice}
+                                        onChange={(e) => setEditPrice(Number(e.target.value))}
+                                        className="w-full p-2 border border-slate-200 rounded-lg text-lg font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900"
+                                    />
+                                ) : (
+                                    <span className="text-xl font-black text-slate-800">PKR {product.price.toLocaleString()}</span>
+                                )}
                             </div>
                         </div>
                         <div className="p-4 rounded-xl border border-slate-200 bg-white">
                             <p className="text-xs font-bold text-slate-400 uppercase mb-1">Stock Level</p>
                             <div className="flex items-center gap-2">
                                 <Package size={16} className="text-slate-400" />
-                                <span className={`font-bold ${product.stock < 10 ? 'text-red-600' : 'text-slate-800'}`}>{product.stock} Units</span>
+                                {isEditing ? (
+                                    <input
+                                        type="number"
+                                        value={editStock}
+                                        onChange={(e) => setEditStock(Number(e.target.value))}
+                                        className="w-full p-2 border border-slate-200 rounded-lg font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900"
+                                    />
+                                ) : (
+                                    <span className={`font-bold ${product.stock < 10 ? 'text-red-600' : 'text-slate-800'}`}>{product.stock} Units</span>
+                                )}
                             </div>
                         </div>
                         <div className="p-4 rounded-xl border border-slate-200 bg-white">
@@ -202,11 +228,27 @@ const ProductDetailModal = ({ product, onClose, onUpdate }: { product: GlobalPro
                         </div>
                     </div>
 
+                    {showHistory && (
+                        <div className="bg-slate-50 rounded-xl border border-slate-100 p-4 space-y-2 animate-in fade-in">
+                            <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><RefreshCw size={14} /> Change History</h4>
+                            <div className="flex justify-between text-xs"><span className="text-slate-500">{product.lastUpdated}</span><span className="font-bold text-slate-700">Stock / price synced</span></div>
+                            <div className="flex justify-between text-xs"><span className="text-slate-500">Oct 24, 2023</span><span className="font-bold text-slate-700">Item created by {product.sourceName}</span></div>
+                        </div>
+                    )}
+
                     <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
-                        <button className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50">View History</button>
-                        <button className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 flex items-center gap-2">
-                            <Edit3 size={14} /> Edit Details
+                        <button onClick={() => setShowHistory(h => !h)} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50">
+                            {showHistory ? 'Hide History' : 'View History'}
                         </button>
+                        {isEditing ? (
+                            <button onClick={handleSaveEdit} className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 flex items-center gap-2">
+                                <Save size={14} /> Save Changes
+                            </button>
+                        ) : (
+                            <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 flex items-center gap-2">
+                                <Edit3 size={14} /> Edit Details
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -214,33 +256,67 @@ const ProductDetailModal = ({ product, onClose, onUpdate }: { product: GlobalPro
     );
 };
 
-const CategoryManager = () => (
+const CategoryManager = () => {
+    const [categories, setCategories] = useState(['Food', 'Medicine', 'Toys', 'Accessories', 'Grooming', 'Tech']);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+    const handleAddCategory = () => {
+        const name = window.prompt('New root category name:');
+        if (name && name.trim()) {
+            setCategories(prev => [...prev, name.trim()]);
+        }
+    };
+
+    const handleRename = (e: React.MouseEvent, cat: string) => {
+        e.stopPropagation();
+        const name = window.prompt('Rename category:', cat);
+        if (name && name.trim()) {
+            setCategories(prev => prev.map(c => c === cat ? name.trim() : c));
+            setSelectedCategory(prev => prev === cat ? name.trim() : prev);
+        }
+    };
+
+    return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm md:col-span-1">
             <h3 className="font-bold text-lg text-slate-800 mb-4">Taxonomy Tree</h3>
             <div className="space-y-1">
-                {['Food', 'Medicine', 'Toys', 'Accessories', 'Grooming', 'Tech'].map(cat => (
+                {categories.map(cat => (
                     <div key={cat} className="group">
-                        <button className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors text-left">
+                        <button
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors text-left ${selectedCategory === cat ? 'bg-slate-100' : ''}`}
+                        >
                             <div className="flex items-center gap-2">
                                 <ChevronRight size={14} className="text-slate-400" />
                                 <span className="font-bold text-slate-700 text-sm">{cat}</span>
                             </div>
-                            <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Edit</span>
+                            <span onClick={(e) => handleRename(e, cat)} className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-200">Edit</span>
                         </button>
                     </div>
                 ))}
-                <button className="w-full mt-4 py-2 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-xs hover:border-blue-300 hover:text-blue-500 transition-colors flex items-center justify-center gap-2">
+                <button onClick={handleAddCategory} className="w-full mt-4 py-2 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-xs hover:border-blue-300 hover:text-blue-500 transition-colors flex items-center justify-center gap-2">
                     <Plus size={14} /> Add Root Category
                 </button>
             </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm md:col-span-2 flex flex-col items-center justify-center text-center text-slate-400">
-            <Layers size={48} className="mb-4 opacity-20" />
-            <p className="font-medium">Select a category to manage attributes and sub-categories.</p>
+            {selectedCategory ? (
+                <div className="text-slate-700">
+                    <Layers size={48} className="mb-4 opacity-20 mx-auto" />
+                    <h4 className="font-black text-lg text-slate-800">{selectedCategory}</h4>
+                    <p className="font-medium text-sm text-slate-500 mt-1">Manage attributes and sub-categories for this category.</p>
+                </div>
+            ) : (
+                <>
+                    <Layers size={48} className="mb-4 opacity-20" />
+                    <p className="font-medium">Select a category to manage attributes and sub-categories.</p>
+                </>
+            )}
         </div>
     </div>
-);
+    );
+};
 
 // --- Main Component ---
 

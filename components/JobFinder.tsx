@@ -11,12 +11,42 @@ interface JobFinderProps {
 // --- SUB-COMPONENT: Job Details Modal ---
 const JobDetailsModal = ({ job, onClose, onApply, applied, userRole }: { job: any, onClose: () => void, onApply: () => void, applied: boolean, userRole: UserRole }) => {
     const [bid, setBid] = useState('');
+    const [note, setNote] = useState<string | null>(null);
 
     const isMedical = userRole === UserRole.VET || userRole === UserRole.CLINIC;
+
+    const flash = (msg: string) => {
+        setNote(msg);
+        setTimeout(() => setNote(null), 2500);
+    };
+
+    const handleShare = async () => {
+        const shareData = {
+            title: `${job.type} — ${job.pet}`,
+            text: `Check out this ${job.type} job for ${job.pet} (${job.breed}) on PawPortal.`,
+            url: window.location.href,
+        };
+        try {
+            if (navigator.share) {
+                await navigator.share(shareData);
+            } else {
+                await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+                flash('Link copied to clipboard!');
+            }
+        } catch {
+            /* user cancelled share — no-op */
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
             <div className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 relative">
+                {note && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-2xl z-30 animate-in slide-in-from-top-2 fade-in flex items-center gap-2">
+                        <CheckCircle size={16} className="text-emerald-400" />
+                        <p className="text-xs font-bold">{note}</p>
+                    </div>
+                )}
                 {/* Header Image */}
                 <div className="h-48 bg-slate-100 relative">
                     <img src={job.image} className="w-full h-full object-cover" />
@@ -24,7 +54,7 @@ const JobDetailsModal = ({ job, onClose, onApply, applied, userRole }: { job: an
                     
                     {/* Header Controls */}
                     <div className="absolute top-4 right-4 flex gap-2">
-                        <button className="p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-colors">
+                        <button onClick={handleShare} className="p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-colors">
                             <Share2 size={20} />
                         </button>
                         <button onClick={onClose} className="p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md transition-colors">
@@ -72,7 +102,7 @@ const JobDetailsModal = ({ job, onClose, onApply, applied, userRole }: { job: an
                                 </div>
                             </div>
                         </div>
-                        <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100">
+                        <button onClick={() => flash(`${job.owner.name}'s full profile is coming soon.`)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100">
                             View Profile
                         </button>
                     </div>

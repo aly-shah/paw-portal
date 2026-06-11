@@ -251,6 +251,13 @@ const SystemSettings = () => {
     const [config, setConfig] = useState<SystemConfig>(INITIAL_CONFIG);
     const [isDirty, setIsDirty] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [toast, setToast] = useState<string | null>(null);
+    const logoInputRef = React.useRef<HTMLInputElement>(null);
+
+    const showToast = (msg: string) => {
+        setToast(msg);
+        setTimeout(() => setToast(null), 2500);
+    };
 
     const handleChange = (section: keyof SystemConfig, key: string, value: any) => {
         setConfig(prev => ({
@@ -264,9 +271,42 @@ const SystemSettings = () => {
     };
 
     const handleSave = () => {
-        // API call to save settings would go here
+        // No backend in this demo; persist to local state and confirm.
         setIsDirty(false);
-        // Show toast or notification
+        showToast('System settings saved');
+    };
+
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        handleChange('branding', 'logoUrl', url);
+        showToast('Logo updated');
+    };
+
+    const handleCheckUpdates = () => showToast('You are running the latest version (v4.2.0)');
+
+    const handleDownloadBackup = () => {
+        const backup = JSON.stringify(config, null, 2);
+        const blob = new Blob([backup], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `pawportal_backup_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleExportLogs = () => {
+        const rows = AUDIT_LOGS.filter(l => l.module === 'Settings' || l.module === 'Integrations');
+        const csv = ['User,Action,Time,Status,Module', ...rows.map(l => `"${l.user}","${l.action}","${l.time}",${l.status},${l.module}`)].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `config_logs_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const renderGeneralSettings = () => (
@@ -511,7 +551,8 @@ const SystemSettings = () => {
                         <div className="p-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
                             <img src={config.branding.logoUrl} alt="Logo" className="h-12 object-contain mb-4" />
                             <p className="text-xs text-slate-400">Recommended: 512x512 PNG</p>
-                            <button className="mt-4 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">Upload New</button>
+                            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                            <button onClick={() => logoInputRef.current?.click()} className="mt-4 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">Upload New</button>
                         </div>
                     </div>
                 </div>
@@ -527,12 +568,12 @@ const SystemSettings = () => {
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                         <p className="text-xs font-bold text-slate-400 uppercase">System Version</p>
                         <p className="text-lg font-black text-slate-800">v4.2.0 (Stable)</p>
-                        <button className="mt-2 text-xs font-bold text-blue-600 hover:underline">Check for Updates</button>
+                        <button onClick={handleCheckUpdates} className="mt-2 text-xs font-bold text-blue-600 hover:underline">Check for Updates</button>
                     </div>
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                         <p className="text-xs font-bold text-slate-400 uppercase">Last Backup</p>
                         <p className="text-lg font-black text-slate-800">2 Hours Ago</p>
-                        <button className="mt-2 text-xs font-bold text-emerald-600 hover:underline">Download Backup</button>
+                        <button onClick={handleDownloadBackup} className="mt-2 text-xs font-bold text-emerald-600 hover:underline">Download Backup</button>
                     </div>
                 </div>
             </div>
@@ -540,7 +581,7 @@ const SystemSettings = () => {
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><History size={18} /> Recent Configuration Changes</h3>
-                    <button className="text-xs font-bold text-slate-500 hover:text-slate-800">Export Logs</button>
+                    <button onClick={handleExportLogs} className="text-xs font-bold text-slate-500 hover:text-slate-800">Export Logs</button>
                 </div>
                 <div className="space-y-3">
                     {AUDIT_LOGS.filter(l => l.module === 'Settings' || l.module === 'Integrations').map(log => (
@@ -559,6 +600,14 @@ const SystemSettings = () => {
 
     return (
         <div className="flex h-full flex-col bg-slate-50/50">
+            {/* Toast */}
+            {toast && (
+                <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl z-[60] flex items-center gap-2 animate-in slide-in-from-top-4 fade-in">
+                    <CheckCircle size={16} className="text-emerald-400" />
+                    <span className="text-sm font-bold">{toast}</span>
+                </div>
+            )}
+
             {/* Save Bar */}
             {isDirty && (
                 <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-6 animate-in slide-in-from-bottom-10 fade-in">
@@ -633,6 +682,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onLogout }) =
     const [editingIntegration, setEditingIntegration] = useState<ApiIntegration | null>(null);
     const [activeIntegrationFilter, setActiveIntegrationFilter] = useState<IntegrationType | 'ALL'>('ALL');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [growthRange, setGrowthRange] = useState('Last 6 Months');
 
     const filteredIntegrations = integrations.filter(i => activeIntegrationFilter === 'ALL' || i.type === activeIntegrationFilter);
 
@@ -665,7 +715,11 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onLogout }) =
                 <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-800 text-lg">System Growth</h3>
-                        <select className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-xs font-bold outline-none">
+                        <select
+                            value={growthRange}
+                            onChange={(e) => setGrowthRange(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-xs font-bold outline-none"
+                        >
                             <option>Last 6 Months</option>
                             <option>Year to Date</option>
                         </select>

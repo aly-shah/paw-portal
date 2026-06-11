@@ -17,6 +17,26 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
   const [heroIndex, setHeroIndex] = useState(0);
   const [checkoutStep, setCheckoutStep] = useState<'CART' | 'CHECKOUT' | 'SUCCESS'>('CART');
   const [sortOption, setSortOption] = useState('POPULAR');
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [modalQty, setModalQty] = useState(1);
+  const [subscribe, setSubscribe] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+      setToast(msg);
+      setTimeout(() => setToast(null), 2500);
+  };
+
+  const toggleWishlist = (id: string, e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      setWishlist(prev => prev.includes(id) ? prev.filter(w => w !== id) : [...prev, id]);
+  };
+
+  // Reset quick-view modal controls whenever a new product is opened
+  useEffect(() => {
+      setModalQty(1);
+      setSubscribe(false);
+  }, [selectedProduct]);
 
   const HERO_SLIDES = [
       { title: "Premium Nutrition", subtitle: "Get 20% off your first Royal Canin order.", color: "from-indigo-900 to-purple-900", tag: "Top Deal" },
@@ -101,7 +121,13 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
              </span>
              <h2 className="text-4xl font-black mb-3 leading-tight">{HERO_SLIDES[heroIndex].title}</h2>
              <p className="text-lg text-white/80 mb-6">{HERO_SLIDES[heroIndex].subtitle}</p>
-             <button className="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold hover:bg-slate-50 transition-transform hover:scale-105 shadow-lg">
+             <button
+                 onClick={() => {
+                     setActiveCategory('ALL');
+                     setSearchQuery('');
+                     document.getElementById('marketplace-grid')?.scrollIntoView({ behavior: 'smooth' });
+                 }}
+                 className="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold hover:bg-slate-50 transition-transform hover:scale-105 shadow-lg">
                  Shop Now
              </button>
           </div>
@@ -181,7 +207,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
 
       {/* Product Grid */}
       {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div id="marketplace-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {filteredProducts.map(product => (
                   <div key={product.id} className="group bg-white rounded-2xl border border-slate-100 p-4 hover:shadow-xl hover:border-slate-200 transition-all duration-300 flex flex-col">
                       <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-4 cursor-pointer" onClick={() => setSelectedProduct(product)}>
@@ -195,8 +221,10 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
                                   {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
                               </div>
                           )}
-                          <button className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0">
-                              <Heart size={16} />
+                          <button
+                            onClick={(e) => toggleWishlist(product.id, e)}
+                            className={`absolute top-2 right-2 p-2 bg-white rounded-full shadow-sm transition-colors opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 ${wishlist.includes(product.id) ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                              <Heart size={16} fill={wishlist.includes(product.id) ? 'currentColor' : 'none'} />
                           </button>
                           {product.stock < 10 && (
                               <div className="absolute bottom-2 left-2 bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-1 rounded-md border border-amber-200">
@@ -279,7 +307,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
                               <p className="font-bold text-slate-800">Jane Doe</p>
                               <p>House 42, Street 10, DHA Phase 6</p>
                               <p>Karachi, Pakistan</p>
-                              <button className="text-teal-600 font-bold text-xs mt-2 hover:underline">Change</button>
+                              <button onClick={() => showToast('Address editing is coming soon.')} className="text-teal-600 font-bold text-xs mt-2 hover:underline">Change</button>
                           </div>
                       </div>
 
@@ -293,7 +321,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
                               </div>
                               <CheckCircle size={16} className="text-teal-600" />
                           </div>
-                          <button className="w-full py-3 border border-slate-200 rounded-xl text-slate-500 font-bold text-sm hover:bg-slate-50">Add Payment Method</button>
+                          <button onClick={() => showToast('Adding new payment methods is coming soon.')} className="w-full py-3 border border-slate-200 rounded-xl text-slate-500 font-bold text-sm hover:bg-slate-50">Add Payment Method</button>
                       </div>
                   </div>
               ) : (
@@ -398,25 +426,25 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
                       </p>
 
                       {/* Subscribe Toggle */}
-                      <div className="mb-8 p-4 rounded-xl border-2 border-indigo-100 bg-indigo-50/50 flex items-start gap-3 cursor-pointer hover:bg-indigo-50 transition-colors">
+                      <div onClick={() => setSubscribe(s => !s)} className="mb-8 p-4 rounded-xl border-2 border-indigo-100 bg-indigo-50/50 flex items-start gap-3 cursor-pointer hover:bg-indigo-50 transition-colors">
                           <div className="mt-1"><RotateCcw className="text-indigo-600" size={20} /></div>
                           <div>
                               <h4 className="font-bold text-indigo-900 text-sm">Subscribe & Save 10%</h4>
                               <p className="text-xs text-indigo-600 mt-1">Get this delivered every 4 weeks. Cancel anytime.</p>
                           </div>
                           <div className="ml-auto">
-                               <input type="checkbox" className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300" />
+                               <input type="checkbox" checked={subscribe} onChange={() => setSubscribe(s => !s)} onClick={(e) => e.stopPropagation()} className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300" />
                           </div>
                       </div>
 
                       <div className="mt-auto flex gap-3">
                           <div className="flex items-center border border-slate-200 rounded-xl">
-                              <button className="px-3 py-3 text-slate-500 hover:bg-slate-50 rounded-l-xl"><Minus size={18} /></button>
-                              <span className="px-2 font-bold text-slate-800">1</span>
-                              <button className="px-3 py-3 text-slate-500 hover:bg-slate-50 rounded-r-xl"><Plus size={18} /></button>
+                              <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="px-3 py-3 text-slate-500 hover:bg-slate-50 rounded-l-xl"><Minus size={18} /></button>
+                              <span className="px-2 font-bold text-slate-800">{modalQty}</span>
+                              <button onClick={() => setModalQty(q => q + 1)} className="px-3 py-3 text-slate-500 hover:bg-slate-50 rounded-r-xl"><Plus size={18} /></button>
                           </div>
-                          <button 
-                            onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
+                          <button
+                            onClick={() => { addToCart(selectedProduct, modalQty); setSelectedProduct(null); }}
                             className="flex-1 bg-slate-900 text-white rounded-xl font-bold hover:bg-teal-600 transition-colors shadow-lg"
                           >
                               Add to Cart
@@ -429,6 +457,14 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
 
       {/* Overlay for cart drawer */}
       {isCartOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setIsCartOpen(false)} />}
+
+      {/* Toast Notification */}
+      {toast && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-2xl z-[60] animate-in slide-in-from-bottom-5 fade-in flex items-center gap-3">
+              <CheckCircle size={20} className="text-emerald-400" />
+              <p className="text-sm font-bold">{toast}</p>
+          </div>
+      )}
     </div>
   );
 };

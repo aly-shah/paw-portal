@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, MapPin, Package, Users, DollarSign, ArrowUpRight, ArrowDownRight, Star } from 'lucide-react';
+import { TrendingUp, MapPin, Package, Users, DollarSign, ArrowUpRight, ArrowDownRight, Star, CheckCircle } from 'lucide-react';
 
 const revenueByArea = [
   { name: 'DHA Phase 6', revenue: 120000, visits: 15 },
@@ -25,6 +25,33 @@ const topClients = [
 ];
 
 const VetAnalytics: React.FC = () => {
+  const [showAllClients, setShowAllClients] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const handleExport = () => {
+    // Build a CSV from the analytics data and download it client-side
+    const rows = [
+      ['Zone', 'Revenue (PKR)', 'Visits'],
+      ...revenueByArea.map(r => [r.name, String(r.revenue), String(r.visits)]),
+    ];
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'practice-report.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Report exported as CSV');
+  };
+
+  const displayedClients = showAllClients ? topClients : topClients.slice(0, 3);
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       {/* Header */}
@@ -34,10 +61,10 @@ const VetAnalytics: React.FC = () => {
               <p className="text-slate-500">AI-driven insights to optimize your service area and revenue.</p>
           </div>
           <div className="flex gap-2">
-              <button className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-50">
+              <button onClick={handleExport} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-50">
                   Export Report
               </button>
-              <button className="px-4 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 shadow-lg">
+              <button onClick={() => showToast('Analytics settings coming soon')} className="px-4 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 shadow-lg">
                   Settings
               </button>
           </div>
@@ -139,7 +166,7 @@ const VetAnalytics: React.FC = () => {
                    <h3 className="text-lg font-bold text-slate-800">Top Client Lifetime Value (CLV)</h3>
                    <p className="text-sm text-slate-500">Identify VIPs for loyalty rewards.</p>
               </div>
-              <button className="text-teal-600 font-bold text-sm hover:underline">View All</button>
+              <button onClick={() => setShowAllClients(prev => !prev)} className="text-teal-600 font-bold text-sm hover:underline">{showAllClients ? 'Show Less' : 'View All'}</button>
           </div>
           <table className="w-full text-left">
               <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase">
@@ -152,7 +179,7 @@ const VetAnalytics: React.FC = () => {
                   </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                  {topClients.map((client, i) => (
+                  {displayedClients.map((client, i) => (
                       <tr key={i} className="hover:bg-slate-50 transition-colors">
                           <td className="p-4 font-bold text-slate-700">{client.name}</td>
                           <td className="p-4 text-slate-600">{client.pet}</td>
@@ -172,6 +199,13 @@ const VetAnalytics: React.FC = () => {
               </tbody>
           </table>
       </div>
+
+      {/* Transient Toast */}
+      {toast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-sm font-bold animate-in fade-in slide-in-from-bottom-4">
+              <CheckCircle size={16} className="text-emerald-400" /> {toast}
+          </div>
+      )}
     </div>
   );
 };

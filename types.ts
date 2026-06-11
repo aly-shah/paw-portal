@@ -14,6 +14,14 @@ export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN'
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  avatar?: string;
+}
+
 export type ConnectionStatus = 'PENDING' | 'CONNECTED' | 'REJECTED';
 
 export interface Connection {

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, User, CreditCard, Shield, CheckCircle, Smartphone, Building2, Lock, Bell, Globe, Camera, Save, AlertCircle, Briefcase, Award, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -41,12 +41,35 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
 
+  // Avatar upload + lightweight toast feedback
+  const [avatar, setAvatar] = useState('https://picsum.photos/id/64/150/150');
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setAvatar(URL.createObjectURL(e.target.files[0]));
+      showToast('Profile photo updated.');
+    }
+  };
+
   if (!isOpen) return null;
 
   const isProvider = userRole === UserRole.VET || userRole === UserRole.CLINIC || userRole === UserRole.VENDOR || userRole === UserRole.CARE_GIVER;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 text-white text-sm font-bold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-top-4 fade-in">
+          <CheckCircle size={16} className="text-emerald-400" /> {toast}
+        </div>
+      )}
       <div className="bg-white w-full max-w-4xl h-[85vh] rounded-2xl shadow-2xl flex overflow-hidden animate-in zoom-in-95">
         
         {/* Sidebar Navigation */}
@@ -116,10 +139,11 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
                     <div className="space-y-8 max-w-2xl">
                         <div className="flex items-center gap-6">
                             <div className="relative group">
-                                <img src="https://picsum.photos/id/64/150/150" alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-slate-50 shadow-md" />
-                                <button className="absolute bottom-0 right-0 p-2 bg-slate-900 text-white rounded-full shadow-lg hover:bg-slate-700 transition-colors">
+                                <img src={avatar} alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-slate-50 shadow-md" />
+                                <button onClick={() => avatarInputRef.current?.click()} className="absolute bottom-0 right-0 p-2 bg-slate-900 text-white rounded-full shadow-lg hover:bg-slate-700 transition-colors">
                                     <Camera size={16} />
                                 </button>
+                                <input type="file" ref={avatarInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
                             </div>
                             <div>
                                 <h4 className="text-xl font-bold text-slate-800">{userData.name}</h4>
@@ -267,7 +291,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
                                     <div className="absolute bottom-0 left-0 w-24 h-24 bg-teal-500 opacity-10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
                                 </div>
                                 
-                                <button className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold hover:bg-slate-50 hover:border-slate-300 hover:text-slate-600 transition-all flex items-center justify-center gap-2">
+                                <button onClick={() => showToast('Add a card flow coming soon.')} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold hover:bg-slate-50 hover:border-slate-300 hover:text-slate-600 transition-all flex items-center justify-center gap-2">
                                     <CreditCard size={20} /> Add New Payment Method
                                 </button>
                             </div>
@@ -320,7 +344,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
                                             <p className="text-xs text-slate-400">PVMC-12345</p>
                                         </div>
                                     </div>
-                                    <button className="text-xs font-bold text-blue-600 hover:underline">Update Document</button>
+                                    <button onClick={() => showToast('Document upload will open here.')} className="text-xs font-bold text-blue-600 hover:underline">Update Document</button>
                                 </div>
                             )}
                         </div>
@@ -439,7 +463,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
                                         </button>
                                     </div>
                                 </div>
-                                <button className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm">Update Password</button>
+                                <button onClick={() => showToast('Password updated successfully.')} className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm">Update Password</button>
                             </div>
                          </div>
 
@@ -448,7 +472,12 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ isOpen, onClose, user
                                  <h4 className="font-bold text-slate-800 mb-1">Two-Factor Authentication</h4>
                                  <p className="text-xs text-slate-500">Add an extra layer of security to your account.</p>
                              </div>
-                             <button className="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-lg text-sm hover:bg-slate-50">Enable 2FA</button>
+                             <button
+                                onClick={() => { setTwoFactorEnabled(v => !v); showToast(twoFactorEnabled ? 'Two-factor authentication disabled.' : 'Two-factor authentication enabled.'); }}
+                                className={`px-4 py-2 border font-bold rounded-lg text-sm transition-colors ${twoFactorEnabled ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                             >
+                                {twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+                             </button>
                          </div>
                     </div>
                 )}

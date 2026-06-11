@@ -67,6 +67,8 @@ const DayStream: React.FC<DayStreamProps> = ({ onStartVisit }) => {
   const [showMap, setShowMap] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<'EN_ROUTE' | 'ARRIVED' | 'IN_CONSULT'>('EN_ROUTE');
   const [isPatientPanelExpanded, setIsPatientPanelExpanded] = useState(true);
+  const [showNotes, setShowNotes] = useState(false);
+  const [routeNotes, setRouteNotes] = useState('');
 
   // Initialize: Collapse Next Patient on Mobile/Tablet (<1024px), Expand on Desktop
   useEffect(() => {
@@ -221,11 +223,27 @@ const DayStream: React.FC<DayStreamProps> = ({ onStartVisit }) => {
                                <button onClick={(e) => { e.stopPropagation(); window.alert('Calling owner...'); }} className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors">
                                    <Phone size={16} /> Call
                                </button>
-                               <button onClick={(e) => { e.stopPropagation(); }} className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+                               <button onClick={(e) => { e.stopPropagation(); setShowNotes(prev => !prev); }} className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors">
                                    <FileText size={16} /> Notes
                                </button>
                            </div>
                       </div>
+
+                      {/* Quick Visit Notes */}
+                      {showNotes && (
+                          <div className="mt-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-between items-center mb-2">
+                                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2"><FileText size={12} /> Quick Notes for {nextPatient?.name}</p>
+                                  <button onClick={() => setShowNotes(false)} className="p-1 text-slate-400 hover:text-white rounded-full hover:bg-white/10"><X size={14} /></button>
+                              </div>
+                              <textarea
+                                  value={routeNotes}
+                                  onChange={(e) => setRouteNotes(e.target.value)}
+                                  placeholder="Jot down a reminder before you arrive..."
+                                  className="w-full h-24 p-3 bg-slate-900/50 border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                              />
+                          </div>
+                      )}
                   </div>
               )}
           </div>

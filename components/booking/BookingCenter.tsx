@@ -86,7 +86,7 @@ const BookingCenter: React.FC = () => {
                 </div>
                 {a.status === 'CONFIRMED' ? (
                   <div className="flex items-center gap-2">
-                    {a.mode === 'TELEHEALTH' && <Button size="sm" variant="secondary"><Video size={14} /> Join</Button>}
+                    {a.mode === 'TELEHEALTH' && <Button size="sm" variant="secondary" onClick={() => toast(`Connecting you to your video consult with ${a.providerName}…`, 'info')}><Video size={14} /> Join</Button>}
                     <Badge tone="success"><Check size={12} /> Confirmed</Badge>
                     <button onClick={() => cancelAppointment(a.id)} title="Cancel" className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
                       <X size={16} />

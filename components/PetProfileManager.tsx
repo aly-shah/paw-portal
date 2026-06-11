@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Pet, PetListing } from '../types';
-import { MOCK_PATIENTS_DETAILED, PET_TAXONOMY, PET_PERSONALITY_TRAITS, PET_FAVORITES_SUGGESTIONS } from '../constants';
+import { PET_TAXONOMY, PET_PERSONALITY_TRAITS, PET_FAVORITES_SUGGESTIONS } from '../constants';
 import { Search, Edit2, Save, Camera, Eye, Sparkles, Trash2, Activity, Smile, Dna, HeartHandshake, Tag, Shield, Calendar, Utensils, AlertCircle, Check, Plus, X, Heart, Palette, DollarSign, Home, Users, CheckCircle, ArrowRight, BarChart2 } from 'lucide-react';
 import HeritageDashboard from './genetics/HeritageDashboard';
 import AdoptionCenter from './AdoptionCenter';
+import { usePawData } from '../contexts/PawDataContext';
 
 const PetProfileManager: React.FC = () => {
-  const [pets, setPets] = useState<Pet[]>(MOCK_PATIENTS_DETAILED as unknown as Pet[]);
-  const [selectedPetId, setSelectedPetId] = useState<string | null>(pets[0]?.id || null);
+  const { myPets: pets, addPet, updatePet, deletePet } = usePawData();
+  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'HERITAGE' | 'ADOPTION'>('PROFILE');
@@ -25,15 +26,21 @@ const PetProfileManager: React.FC = () => {
       preferences: [] as string[]
   });
 
+  // When true, the form represents a brand-new pet not yet persisted. Saving
+  // calls addPet(...); cancelling discards it without touching the API.
+  const [isCreating, setIsCreating] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedPet = pets.find(p => p.id === selectedPetId);
-  const hasHeritage = selectedPet && (selectedPet.type === 'Dog' || selectedPet.type === 'Cat');
-  
   // Form State
   const [formData, setFormData] = useState<Partial<Pet>>({});
   const [customTagInput, setCustomTagInput] = useState('');
   const [customFavInput, setCustomFavInput] = useState('');
+
+  const selectedPet = isCreating
+    ? (formData as Pet)
+    : pets.find(p => p.id === selectedPetId);
+  const hasHeritage = selectedPet && (selectedPet.type === 'Dog' || selectedPet.type === 'Cat');
 
   // Home Preference Options
   const HOME_PREFERENCES = [
@@ -46,26 +53,74 @@ const PetProfileManager: React.FC = () => {
       "Work from Home Preferred"
   ];
 
+  // Auto-select the first pet once pets load from the API (or after a deletion
+  // leaves the current selection invalid).
   useEffect(() => {
-      if (selectedPet) {
-          setFormData({ ...selectedPet });
-          setIsMicrochipped(!!selectedPet.microchip);
+      // Don't interfere while the user is drafting a brand-new (unsaved) pet.
+      if (isCreating) return;
+      if (pets.length === 0) {
+          if (selectedPetId !== null) setSelectedPetId(null);
+          return;
+      }
+      if (!selectedPetId || !pets.some(p => p.id === selectedPetId)) {
+          setSelectedPetId(pets[0].id);
+      }
+  }, [pets, selectedPetId, isCreating]);
+
+  useEffect(() => {
+      // Skip while drafting a new pet — its formData is managed by the create flow.
+      if (isCreating) return;
+      const pet = pets.find(p => p.id === selectedPetId);
+      if (pet) {
+          setFormData({ ...pet });
+          setIsMicrochipped(!!pet.microchip);
           setIsEditing(false);
           // Reset listing state when switching pets (mock)
-          setActiveListing(null); 
+          setActiveListing(null);
           setRehomeStep(1);
           setRehomeData({ type: 'ADOPTION', price: 0, reason: 'Relocation', description: '', preferences: [] });
       }
   }, [selectedPetId]);
 
   const handleSelectPet = (pet: Pet) => {
+    setIsCreating(false);
     setSelectedPetId(pet.id);
     setActiveTab('PROFILE');
   };
 
+  const handleCancelEdit = () => {
+    if (isCreating) {
+      // Discard the unsaved new pet and fall back to the existing pack.
+      setIsCreating(false);
+      setSelectedPetId(pets[0]?.id || null);
+    }
+    setIsEditing(false);
+  };
+
   const handleSave = () => {
+    if (isCreating) {
+      const newPet = { ...formData } as Pet;
+      addPet(newPet);
+      setIsCreating(false);
+      setSelectedPetId(newPet.id);
+    } else {
+      if (!selectedPetId) return;
+      updatePet({ ...selectedPet, ...formData } as Pet);
+    }
+    setIsEditing(false);
+  };
+
+  const handleDeletePet = () => {
+    if (isCreating) {
+      // Nothing persisted yet — just drop the draft.
+      handleCancelEdit();
+      return;
+    }
     if (!selectedPetId) return;
-    setPets(prev => prev.map(p => p.id === selectedPetId ? { ...p, ...formData } as Pet : p));
+    if (!confirm('Delete pet? This cannot be undone.')) return;
+    const remaining = pets.filter(p => p.id !== selectedPetId);
+    deletePet(selectedPetId);
+    setSelectedPetId(remaining[0]?.id || null);
     setIsEditing(false);
   };
 
@@ -78,7 +133,7 @@ const PetProfileManager: React.FC = () => {
   };
 
   const handleCreateNewPet = () => {
-      const newId = `new-${Date.now()}`;
+      const newId = `pet-${Date.now()}`;
       const newPet: Pet = {
           id: newId,
           name: 'New Pet',
@@ -93,8 +148,10 @@ const PetProfileManager: React.FC = () => {
           personality: { energyLevel: 'Medium', trainability: 'Moderate', tags: [] },
           dynamicDetails: { favorites: [] }
       };
-      setPets(prev => [...prev, newPet]);
-      setSelectedPetId(newId);
+      // Hold the new pet as a local draft; it is persisted via addPet on Save.
+      setIsCreating(true);
+      setSelectedPetId(null);
+      setActiveTab('PROFILE');
       setIsEditing(true);
       setIsMicrochipped(false);
       setFormData(newPet);
@@ -428,7 +485,7 @@ const PetProfileManager: React.FC = () => {
                          <div className="flex gap-2">
                              {isEditing ? (
                                  <>
-                                    <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-100 text-sm">Cancel</button>
+                                    <button onClick={handleCancelEdit} className="px-4 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-100 text-sm">Cancel</button>
                                     <button onClick={handleSave} className="px-5 py-2 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 shadow-lg text-sm flex items-center gap-2"><Save size={16} /> Save</button>
                                  </>
                              ) : (
@@ -661,7 +718,7 @@ const PetProfileManager: React.FC = () => {
                                      </div>
                                      
                                      <div className="flex justify-between items-center pt-4">
-                                         <button onClick={() => {if(confirm('Delete pet?')) { /* del logic */ }}} className="text-red-500 text-xs font-bold flex items-center gap-1"><Trash2 size={14}/> Delete Pet</button>
+                                         <button onClick={handleDeletePet} className="text-red-500 text-xs font-bold flex items-center gap-1"><Trash2 size={14}/> Delete Pet</button>
                                          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
                                              <input type="checkbox" checked={formData.isPublic} onChange={e => setFormData({...formData, isPublic: e.target.checked})} className="rounded text-teal-600 focus:ring-teal-500" /> Public Profile
                                          </label>

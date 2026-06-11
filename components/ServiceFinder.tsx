@@ -172,7 +172,22 @@ const ProviderProfileModal = ({ provider, onClose, onBook, userCredits, onDeduct
                                 >
                                     <MessageCircle size={16} /> Message
                                 </button>
-                                <button className="flex-1 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-2">
+                                <button
+                                    onClick={async () => {
+                                        const shareData = {
+                                            title: provider.name,
+                                            text: `Check out ${provider.name} on PawPortal — ${provider.location}, rated ${provider.rating}★`,
+                                        };
+                                        if (navigator.share) {
+                                            try { await navigator.share(shareData); } catch { /* user cancelled */ }
+                                        } else {
+                                            try {
+                                                await navigator.clipboard.writeText(`${shareData.title} — ${shareData.text}`);
+                                                alert('Link copied to clipboard!');
+                                            } catch { alert('Unable to share.'); }
+                                        }
+                                    }}
+                                    className="flex-1 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-2">
                                     <Share2 size={16} /> Share
                                 </button>
                             </div>

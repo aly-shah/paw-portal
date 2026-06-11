@@ -90,14 +90,39 @@ const UserDetailDrawer = ({ user, onClose, onUpdate }: { user: AdminUser, onClos
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PERMISSIONS' | 'SECURITY' | 'ACTIVITY'>('OVERVIEW');
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(user);
+    const [toast, setToast] = useState<string | null>(null);
+    const [mobileSessionRevoked, setMobileSessionRevoked] = useState(false);
+
+    const showToast = (msg: string) => {
+        setToast(msg);
+        setTimeout(() => setToast(null), 2500);
+    };
 
     const handleSave = () => {
         onUpdate(formData);
         setIsEditing(false);
+        showToast('User details updated');
+    };
+
+    const handleSendReset = () => showToast(`Password reset email sent to ${user.email}`);
+    const handleTempPass = () => {
+        const temp = Math.random().toString(36).slice(-8) + '!A1';
+        navigator.clipboard?.writeText(temp).catch(() => {});
+        showToast(`Temp password generated & copied: ${temp}`);
+    };
+    const handleForceLogout = () => {
+        setMobileSessionRevoked(true);
+        showToast('All sessions signed out');
     };
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+            {toast && (
+                <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl z-[60] flex items-center gap-2 animate-in slide-in-from-top-4 fade-in">
+                    <CheckCircle size={16} className="text-emerald-400" />
+                    <span className="text-sm font-bold">{toast}</span>
+                </div>
+            )}
             <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50">
@@ -239,10 +264,10 @@ const UserDetailDrawer = ({ user, onClose, onUpdate }: { user: AdminUser, onClos
                                 <h4 className="font-bold text-slate-800 mb-2">Password Management</h4>
                                 <p className="text-xs text-slate-500 mb-4">Send a reset link or manually override the password.</p>
                                 <div className="flex gap-3">
-                                    <button className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center justify-center gap-2">
+                                    <button onClick={handleSendReset} className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center justify-center gap-2">
                                         <Mail size={14} /> Send Reset Email
                                     </button>
-                                    <button className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center justify-center gap-2">
+                                    <button onClick={handleTempPass} className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 flex items-center justify-center gap-2">
                                         <Key size={14} /> Generate Temp Pass
                                     </button>
                                 </div>
@@ -276,18 +301,20 @@ const UserDetailDrawer = ({ user, onClose, onUpdate }: { user: AdminUser, onClos
                                         </div>
                                         <button className="text-xs font-bold text-slate-400">Current</button>
                                     </div>
-                                    <div className="flex justify-between items-center p-3 border border-slate-200 bg-white rounded-xl">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-700">Mobile App (iOS)</p>
-                                                <p className="text-[10px] text-slate-500">Last active: 2 hours ago</p>
+                                    {!mobileSessionRevoked && (
+                                        <div className="flex justify-between items-center p-3 border border-slate-200 bg-white rounded-xl">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-700">Mobile App (iOS)</p>
+                                                    <p className="text-[10px] text-slate-500">Last active: 2 hours ago</p>
+                                                </div>
                                             </div>
+                                            <button onClick={() => { setMobileSessionRevoked(true); showToast('Session revoked'); }} className="text-xs font-bold text-red-500 hover:underline">Revoke</button>
                                         </div>
-                                        <button className="text-xs font-bold text-red-500 hover:underline">Revoke</button>
-                                    </div>
+                                    )}
                                 </div>
-                                <button className="w-full mt-4 py-3 border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 flex items-center justify-center gap-2">
+                                <button onClick={handleForceLogout} className="w-full mt-4 py-3 border border-red-200 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 flex items-center justify-center gap-2">
                                     <LogOut size={14} /> Force Logout All Devices
                                 </button>
                             </div>
@@ -491,33 +518,55 @@ const AddUserModal = ({ onClose, onAdd }: { onClose: () => void, onAdd: (user: A
     );
 };
 
-const BulkImportModal = ({ onClose }: { onClose: () => void }) => (
+const BulkImportModal = ({ onClose }: { onClose: () => void }) => {
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [fileName, setFileName] = useState<string | null>(null);
+
+    const handleDownloadTemplate = () => {
+        const csv = 'First Name,Last Name,Email,Phone,User Type,Role,Organization\nJane,Doe,jane@example.com,+92 300 1234567,VENDOR,Vendor Owner,Example Co';
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'user_import_template.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleProcess = () => {
+        // No backend in this demo; acknowledge and close.
+        onClose();
+    };
+
+    return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
         <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="font-black text-xl text-slate-800">Bulk User Import</h3>
                 <button onClick={onClose}><XCircle className="text-slate-400 hover:text-slate-600" /></button>
             </div>
-            
-            <div className="border-2 border-dashed border-slate-300 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 transition-colors group">
+
+            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
+            <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-slate-300 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 transition-colors group">
                 <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <Upload size={32} />
                 </div>
-                <p className="font-bold text-slate-700">Click to upload or drag CSV</p>
+                <p className="font-bold text-slate-700">{fileName ?? 'Click to upload or drag CSV'}</p>
                 <p className="text-xs text-slate-400 mt-1">Max 5MB. 1000 rows limit.</p>
             </div>
 
             <div className="mt-6 flex justify-between items-center">
-                <button className="text-xs font-bold text-blue-600 flex items-center gap-2 hover:underline">
+                <button onClick={handleDownloadTemplate} className="text-xs font-bold text-blue-600 flex items-center gap-2 hover:underline">
                     <Download size={14} /> Download Template
                 </button>
-                <button className="bg-slate-900 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-slate-800">
+                <button onClick={handleProcess} className="bg-slate-900 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-slate-800">
                     Process Import
                 </button>
             </div>
         </div>
     </div>
-);
+    );
+};
 
 // --- Main Component ---
 
@@ -553,6 +602,16 @@ const UserManagement: React.FC = () => {
 
     const toggleRow = (id: string) => {
         setSelectedRows(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
+    };
+
+    const handleBulkStatus = (status: UserStatus) => {
+        setUsers(prev => prev.map(u => selectedRows.includes(u.id) ? { ...u, status } : u));
+        setSelectedRows([]);
+    };
+
+    const handleBulkDelete = () => {
+        setUsers(prev => prev.filter(u => !selectedRows.includes(u.id)));
+        setSelectedRows([]);
     };
 
     return (
@@ -637,9 +696,9 @@ const UserManagement: React.FC = () => {
                 <div className="bg-slate-900 text-white px-6 py-3 rounded-xl flex items-center justify-between animate-in slide-in-from-bottom-2 shadow-xl">
                     <span className="font-bold text-sm">{selectedRows.length} Users Selected</span>
                     <div className="flex gap-3">
-                        <button className="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors">Activate</button>
-                        <button className="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors">Deactivate</button>
-                        <button className="text-xs font-bold bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors">Delete</button>
+                        <button onClick={() => handleBulkStatus('ACTIVE')} className="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors">Activate</button>
+                        <button onClick={() => handleBulkStatus('INACTIVE')} className="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors">Deactivate</button>
+                        <button onClick={handleBulkDelete} className="text-xs font-bold bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors">Delete</button>
                     </div>
                 </div>
             )}

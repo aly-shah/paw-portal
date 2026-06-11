@@ -17,6 +17,8 @@ const TransactionEngine: React.FC<TransactionEngineProps> = ({ patient, visitDat
     ]);
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'ONLINE'>('CASH');
     const [paymentDetailsSent, setPaymentDetailsSent] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [followUpScheduled, setFollowUpScheduled] = useState(false);
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
     const [summary, setSummary] = useState('');
     
@@ -30,6 +32,16 @@ const TransactionEngine: React.FC<TransactionEngineProps> = ({ patient, visitDat
         // Simulate sending SMS/Email
         setPaymentDetailsSent(true);
         setTimeout(() => setPaymentDetailsSent(false), 3000);
+    };
+
+    const handleCopyNumber = () => {
+        navigator.clipboard?.writeText('0300 1234567').catch(() => {});
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleScheduleFollowUp = () => {
+        setFollowUpScheduled(true);
     };
 
     const addInvoiceItem = () => {
@@ -211,7 +223,7 @@ const TransactionEngine: React.FC<TransactionEngineProps> = ({ patient, visitDat
                                             <p className="font-mono text-lg font-bold text-slate-800">0300 1234567</p>
                                             <p className="text-xs text-slate-500">Dr. Jane Smith (JazzCash)</p>
                                         </div>
-                                        <button className="p-2 bg-white rounded-lg shadow-sm text-slate-500 hover:text-slate-800"><Copy size={18}/></button>
+                                        <button onClick={handleCopyNumber} title={copied ? 'Copied!' : 'Copy number'} className={`p-2 bg-white rounded-lg shadow-sm transition-colors ${copied ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-800'}`}>{copied ? <CheckCircle size={18}/> : <Copy size={18}/>}</button>
                                     </div>
                                     
                                     {!paymentDetailsSent ? (
@@ -272,8 +284,12 @@ const TransactionEngine: React.FC<TransactionEngineProps> = ({ patient, visitDat
                             </div>
 
                             <div className="flex gap-4">
-                                <button className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 flex items-center justify-center gap-2">
-                                    <Calendar size={18} /> Schedule Follow-up
+                                <button
+                                    onClick={handleScheduleFollowUp}
+                                    disabled={followUpScheduled}
+                                    className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${followUpScheduled ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                >
+                                    {followUpScheduled ? <><CheckCircle size={18} /> Follow-up Scheduled</> : <><Calendar size={18} /> Schedule Follow-up</>}
                                 </button>
                                 <button 
                                     onClick={onComplete}

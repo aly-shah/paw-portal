@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   BrowserRouter, Routes, Route, Navigate,
   useNavigate, useParams, useSearchParams,
@@ -13,21 +13,11 @@ import FeaturesPage from './components/marketing/FeaturesPage';
 import HowItWorksPage from './components/marketing/HowItWorksPage';
 import CommunityPage from './components/marketing/CommunityPage';
 import { UserRole } from './types';
-
-const AUTH_KEY = 'pawportal-auth';
-
-const loadRole = (): UserRole | null => {
-  try {
-    const r = localStorage.getItem(AUTH_KEY);
-    return r ? (r as UserRole) : null;
-  } catch {
-    return null;
-  }
-};
+import { useAuth } from './contexts/AuthContext';
 
 // --- Route wrappers (each gets access to navigate) ---
 
-const AuthRoute: React.FC<{ mode: 'login' | 'signup'; onLogin: (r: UserRole) => void }> = ({ mode, onLogin }) => {
+const AuthRoute: React.FC<{ mode: 'login' | 'signup' }> = ({ mode }) => {
   const nav = useNavigate();
   const [params] = useSearchParams();
   const next = params.get('next');
@@ -35,7 +25,6 @@ const AuthRoute: React.FC<{ mode: 'login' | 'signup'; onLogin: (r: UserRole) => 
     <AuthPage
       initialView={mode}
       onLoginSuccess={(role: UserRole) => {
-        onLogin(role);
         nav(role === UserRole.SUPER_ADMIN ? '/dashboard' : `/dashboard/${next || ''}`);
       }}
       onBack={() => nav('/')}
@@ -43,14 +32,11 @@ const AuthRoute: React.FC<{ mode: 'login' | 'signup'; onLogin: (r: UserRole) => 
   );
 };
 
-const AdminRoute: React.FC<{ onLogin: (r: UserRole) => void }> = ({ onLogin }) => {
+const AdminRoute: React.FC = () => {
   const nav = useNavigate();
   return (
     <AdminLogin
-      onLoginSuccess={(role: UserRole) => {
-        onLogin(role);
-        nav('/dashboard');
-      }}
+      onLoginSuccess={() => nav('/dashboard')}
       onBack={() => nav('/')}
     />
   );
@@ -73,16 +59,17 @@ const ProtectedDashboard: React.FC<{ role: UserRole | null; onLogout: () => void
 };
 
 const App: React.FC = () => {
-  const [role, setRole] = useState<UserRole | null>(() => loadRole());
+  const { user, loading, logout } = useAuth();
+  const role = user ? user.role : null;
 
-  const login = (r: UserRole) => {
-    setRole(r);
-    try { localStorage.setItem(AUTH_KEY, r); } catch { /* ignore */ }
-  };
-  const logout = () => {
-    setRole(null);
-    try { localStorage.removeItem(AUTH_KEY); } catch { /* ignore */ }
-  };
+  // While we resolve an existing session token, avoid flashing the landing page.
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
@@ -91,9 +78,9 @@ const App: React.FC = () => {
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/community" element={<CommunityPage />} />
-        <Route path="/login" element={<AuthRoute mode="login" onLogin={login} />} />
-        <Route path="/signup" element={<AuthRoute mode="signup" onLogin={login} />} />
-        <Route path="/admin" element={<AdminRoute onLogin={login} />} />
+        <Route path="/login" element={<AuthRoute mode="login" />} />
+        <Route path="/signup" element={<AuthRoute mode="signup" />} />
+        <Route path="/admin" element={<AdminRoute />} />
         <Route path="/tag/:petId" element={<TagRoute />} />
         <Route path="/dashboard/*" element={<ProtectedDashboard role={role} onLogout={logout} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
