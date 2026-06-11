@@ -32,6 +32,7 @@ import {
 import { UserRole } from '../types';
 import { MOCK_PATIENTS_DETAILED } from '../constants';
 import { usePawData } from '../contexts/PawDataContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Components
 import Dashboard from './Dashboard';
@@ -86,8 +87,14 @@ const tabToSlug = (tab: string) => (tab === Tab.DASHBOARD ? '' : tab.toLowerCase
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole }) => {
   const { pawPoints } = usePawData();
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Real signed-in user for the chrome (sidebar, top bar, mobile header).
+  const displayName = user?.name || 'PawPortal User';
+  const displayAvatar = user?.avatar || 'https://picsum.photos/id/64/100/100';
+  const roleLabel = userRole.toLowerCase().replace(/_/g, ' ');
 
   // Map URL slug -> Tab (e.g. /dashboard/health -> Tab.HEALTH, /dashboard -> overview).
   const slugToTab = useMemo(
@@ -259,7 +266,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
         </div>
 
         {/* Nav Items */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-hide">
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-hide">
+          <p className={`px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-300 ${!isDesktopExpanded ? 'lg:hidden' : ''}`}>Menu</p>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -267,15 +275,18 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
               <button
                 key={item.id}
                 onClick={() => goTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative ${
-                  isActive 
-                    ? 'bg-slate-900 text-white shadow-md' 
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative ${
+                  isActive
+                    ? 'bg-teal-50 text-teal-700'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 ${isActive ? 'text-teal-400' : 'text-slate-400 group-hover:text-slate-600'}`} />
-                
-                <span className={`text-sm font-bold whitespace-nowrap transition-opacity duration-200 ${!isDesktopExpanded ? 'lg:opacity-0 lg:hidden' : 'opacity-100'} ${isActive ? 'text-white' : ''}`}>
+                {/* Active accent bar */}
+                {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-teal-600" />}
+
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 ${isActive ? 'text-teal-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+
+                <span className={`text-sm font-semibold whitespace-nowrap transition-opacity duration-200 ${!isDesktopExpanded ? 'lg:opacity-0 lg:hidden' : 'opacity-100'}`}>
                     {item.label}
                 </span>
 
@@ -307,14 +318,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
             onClick={() => setShowProfileSettings(true)}
             className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 transition-all ${!isDesktopExpanded ? 'justify-center' : ''}`}
           >
-            <img 
-                src="https://picsum.photos/id/64/100/100" 
-                alt="User" 
-                className="w-8 h-8 rounded-full border-2 border-slate-100 shrink-0" 
+            <img
+                src={displayAvatar}
+                alt={displayName}
+                className="w-8 h-8 rounded-full border-2 border-slate-100 shrink-0 object-cover"
             />
             <div className={`text-left flex-1 min-w-0 transition-opacity duration-200 ${!isDesktopExpanded ? 'lg:opacity-0 lg:hidden' : 'opacity-100'}`}>
-                <p className="text-sm font-bold text-slate-700 truncate">Jane Doe</p>
-                <p className="text-xs text-slate-400 truncate capitalize">{userRole.toLowerCase().replace('_', ' ')}</p>
+                <p className="text-sm font-bold text-slate-700 truncate">{displayName}</p>
+                <p className="text-xs text-slate-400 truncate capitalize">{roleLabel}</p>
             </div>
             {isDesktopExpanded && <Settings size={16} className="text-slate-400 shrink-0" />}
           </button>
@@ -353,7 +364,33 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
                     <span className="font-black text-lg text-slate-800">PawPortal</span>
                 </div>
              </div>
-             <img src="https://picsum.photos/id/64/100/100" className="w-8 h-8 rounded-full border border-slate-200" onClick={() => setShowProfileSettings(true)} />
+             <img src={displayAvatar} className="w-8 h-8 rounded-full border border-slate-200 object-cover" onClick={() => setShowProfileSettings(true)} />
+        </div>
+
+        {/* Desktop top bar */}
+        <div className="hidden lg:flex h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 items-center justify-between px-8 shrink-0 sticky top-0 z-20">
+            <div>
+                <h1 className="text-lg font-black text-slate-800 tracking-tight">{activeTab}</h1>
+                <p className="text-xs text-slate-400 -mt-0.5 capitalize">{roleLabel} workspace</p>
+            </div>
+            <div className="flex items-center gap-3">
+                {userRole === UserRole.OWNER && (
+                    <button
+                        onClick={() => goTab(Tab.REWARDS)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-sm font-bold hover:bg-amber-100 transition-colors"
+                        title="Your Paw Points"
+                    >
+                        <Gift size={15} /> {pawPoints.toLocaleString()}
+                    </button>
+                )}
+                <button
+                    onClick={() => setShowProfileSettings(true)}
+                    className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full hover:bg-slate-100 transition-colors"
+                >
+                    <img src={displayAvatar} alt={displayName} className="w-8 h-8 rounded-full border border-slate-200 object-cover" />
+                    <span className="text-sm font-bold text-slate-700 max-w-[140px] truncate">{displayName}</span>
+                </button>
+            </div>
         </div>
 
         {/* Content Area */}
@@ -381,7 +418,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
                 <button
                   key={item.id}
                   onClick={() => goTab(item.id)}
-                  className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? 'text-primary-600' : 'text-slate-400'}`}
+                  className={`flex flex-1 flex-col items-center gap-0.5 py-2 transition-colors ${isActive ? 'text-teal-600' : 'text-slate-400'}`}
                 >
                   <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                   <span className="text-[10px] font-bold truncate max-w-[64px]">{item.label}</span>
