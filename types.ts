@@ -416,7 +416,7 @@ export interface Appointment {
 }
 
 // --- Paw Points (gamified wellness & loyalty) ---
-export type PointReason = 'WALK' | 'REMINDER' | 'APPOINTMENT' | 'REDEEM' | 'REFERRAL' | 'SCAN';
+export type PointReason = 'WALK' | 'REMINDER' | 'APPOINTMENT' | 'REDEEM' | 'REFERRAL' | 'SCAN' | 'PURCHASE';
 
 export interface PawPointsEntry {
     id: string;

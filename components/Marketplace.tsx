@@ -1,8 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MOCK_PRODUCTS } from '../constants';
 import { Product, CartItem } from '../types';
-import { ShoppingCart, Heart, Plus, Search, X, Star, CheckCircle, Trash2, Minus, ShoppingBag, CreditCard, ArrowRight, Filter, Tag, Truck, RotateCcw } from 'lucide-react';
+import { ShoppingCart, Heart, Plus, Search, X, Star, CheckCircle, Trash2, Minus, ShoppingBag, CreditCard, ArrowRight, Filter, Tag, Truck, RotateCcw, Banknote, MapPin, Pencil, Phone } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { usePawData } from '../contexts/PawDataContext';
+import { api } from '../services/api';
+
+const DELIVERY_FEE = 250;          // flat COD delivery fee (PKR)
+const FREE_DELIVERY_OVER = 5000;   // free delivery above this subtotal
+const addrInput = 'w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500';
 
 interface MarketplaceProps {
     initialCategory?: string;
@@ -21,6 +28,48 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
   const [modalQty, setModalQty] = useState(1);
   const [subscribe, setSubscribe] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  const { user } = useAuth();
+  const { earnPoints } = usePawData();
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'CARD'>('COD');
+  const [placing, setPlacing] = useState(false);
+  const [lastOrder, setLastOrder] = useState<any>(null);
+  const [address, setAddress] = useState({ name: '', phone: '', line: '', city: '' });
+  const [editingAddress, setEditingAddress] = useState(false);
+  const cartLoaded = useRef(false);
+
+  // Load the persisted cart + saved delivery address for this user.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [carts, addrs] = await Promise.all([
+          api.list<any>('user', 'cart'),
+          api.list<any>('user', 'shippingAddress'),
+        ]);
+        if (cancelled) return;
+        if (Array.isArray(carts[0]?.items)) setCart(carts[0].items);
+        const a = addrs[0];
+        setAddress({
+          name: a?.name || user.name || '',
+          phone: a?.phone || '',
+          line: a?.line || '',
+          city: a?.city || '',
+        });
+        if (!a || !a.line) setEditingAddress(true);
+      } catch { /* keep empty cart/address */ } finally {
+        cartLoaded.current = true;
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Persist the cart whenever it changes (after the initial load).
+  useEffect(() => {
+    if (!cartLoaded.current) return;
+    api.create('user', 'cart', { id: 'active', items: cart }).catch(() => {});
+  }, [cart]);
 
   const showToast = (msg: string) => {
       setToast(msg);
@@ -97,17 +146,52 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const deliveryFee = cart.length === 0 || cartTotal >= FREE_DELIVERY_OVER ? 0 : DELIVERY_FEE;
+  const orderTotal = cartTotal + deliveryFee;
 
   const formatCurrency = (amount: number) => {
       return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(amount);
   };
 
-  const handleCheckout = () => {
-      setCheckoutStep('CHECKOUT');
-      setTimeout(() => {
-          setCheckoutStep('SUCCESS');
+  // Place a real, persisted order. Cash on Delivery is the live payment method.
+  const placeOrder = async () => {
+      if (cart.length === 0) return;
+      if (paymentMethod === 'CARD') {
+          showToast('Card payments are coming soon — please choose Cash on Delivery.');
+          return;
+      }
+      if (!address.name.trim() || !address.phone.trim() || !address.line.trim()) {
+          showToast('Please complete your delivery address first.');
+          setEditingAddress(true);
+          return;
+      }
+      setPlacing(true);
+      const order = {
+          id: `ord-${Date.now()}`,
+          items: cart,
+          subtotal: cartTotal,
+          deliveryFee,
+          total: orderTotal,
+          paymentMethod, // 'COD'
+          address,
+          status: 'PENDING',
+          placedAt: new Date().toISOString(),
+      };
+      try {
+          await api.create('user', 'orders', order);
+          await api.create('user', 'shippingAddress', { id: 'me', ...address }); // remember for next time
+          await api.create('user', 'cart', { id: 'active', items: [] });          // clear persisted cart
+          // Reward the purchase: 1 Paw Point per PKR 100 spent.
+          const earned = Math.floor(orderTotal / 100);
+          if (earned > 0) earnPoints('PURCHASE', `Order ${order.id}`, earned);
+          setLastOrder({ ...order, earnedPoints: earned });
           setCart([]);
-      }, 2000);
+          setCheckoutStep('SUCCESS');
+      } catch {
+          showToast('Could not place your order. Please try again.');
+      } finally {
+          setPlacing(false);
+      }
   };
 
   return (
@@ -288,8 +372,20 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
                           <CheckCircle size={40} />
                       </div>
                       <h3 className="text-2xl font-black text-slate-800 mb-2">Order Confirmed!</h3>
-                      <p className="text-slate-500 mb-8">Your order #ORD-9921 has been placed successfully.</p>
-                      <button onClick={() => { setIsCartOpen(false); setCheckoutStep('CART'); }} className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold">Continue Shopping</button>
+                      <p className="text-slate-500 mb-6">Your order <span className="font-mono font-bold text-slate-700">#{(lastOrder?.id || '').toUpperCase()}</span> has been placed.</p>
+                      {lastOrder && (
+                          <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-left">
+                              <div className="flex items-center gap-2 text-amber-800 font-bold mb-1">
+                                  <Banknote size={18} /> Cash on Delivery
+                              </div>
+                              <p className="text-sm text-amber-700">Please keep <span className="font-black">{formatCurrency(lastOrder.total)}</span> ready to pay the rider on delivery.</p>
+                              <p className="text-xs text-amber-600 mt-2">Delivering to {lastOrder.address?.line}, {lastOrder.address?.city || ''}</p>
+                          </div>
+                      )}
+                      {lastOrder?.earnedPoints > 0 && (
+                          <p className="text-sm font-bold text-teal-600 mb-6">🐾 You earned {lastOrder.earnedPoints} Paw Points!</p>
+                      )}
+                      <button onClick={() => { setIsCartOpen(false); setCheckoutStep('CART'); setLastOrder(null); }} className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold">Continue Shopping</button>
                   </div>
               ) : checkoutStep === 'CHECKOUT' ? (
                   <div className="space-y-6 animate-in slide-in-from-right">
@@ -302,26 +398,56 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
                       </div>
                       
                       <div className="space-y-3">
-                          <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wider border-b border-slate-100 pb-2">Shipping Address</h4>
-                          <div className="p-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-600">
-                              <p className="font-bold text-slate-800">Jane Doe</p>
-                              <p>House 42, Street 10, DHA Phase 6</p>
-                              <p>Karachi, Pakistan</p>
-                              <button onClick={() => showToast('Address editing is coming soon.')} className="text-teal-600 font-bold text-xs mt-2 hover:underline">Change</button>
+                          <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                              <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wider flex items-center gap-1.5"><MapPin size={14} /> Delivery Address</h4>
+                              {!editingAddress && (
+                                  <button onClick={() => setEditingAddress(true)} className="text-teal-600 font-bold text-xs hover:underline flex items-center gap-1"><Pencil size={12} /> Edit</button>
+                              )}
                           </div>
+                          {editingAddress ? (
+                              <div className="space-y-2">
+                                  <input value={address.name} onChange={e => setAddress({ ...address, name: e.target.value })} placeholder="Full name" className={addrInput} />
+                                  <div className="relative">
+                                      <Phone size={14} className="absolute left-3 top-3 text-slate-400" />
+                                      <input value={address.phone} onChange={e => setAddress({ ...address, phone: e.target.value })} placeholder="Phone number" className={`${addrInput} pl-8`} />
+                                  </div>
+                                  <input value={address.line} onChange={e => setAddress({ ...address, line: e.target.value })} placeholder="House / street / area" className={addrInput} />
+                                  <input value={address.city} onChange={e => setAddress({ ...address, city: e.target.value })} placeholder="City" className={addrInput} />
+                                  <button onClick={() => setEditingAddress(false)} className="text-xs font-bold text-white bg-slate-900 px-4 py-2 rounded-lg hover:bg-slate-700">Save address</button>
+                              </div>
+                          ) : (
+                              <div className="p-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-600">
+                                  <p className="font-bold text-slate-800">{address.name || 'Add your name'}</p>
+                                  {address.phone && <p>{address.phone}</p>}
+                                  <p>{address.line || 'Add your delivery address'}</p>
+                                  {address.city && <p>{address.city}</p>}
+                              </div>
+                          )}
                       </div>
 
                       <div className="space-y-3">
-                          <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wider border-b border-slate-100 pb-2">Payment</h4>
-                          <div className="p-3 border-2 border-teal-500 bg-teal-50 rounded-xl flex items-center gap-3">
-                              <CreditCard className="text-teal-700" />
+                          <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wider border-b border-slate-100 pb-2">Payment Method</h4>
+                          <button
+                              onClick={() => setPaymentMethod('COD')}
+                              className={`w-full p-3 border-2 rounded-xl flex items-center gap-3 text-left transition-colors ${paymentMethod === 'COD' ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-slate-300'}`}
+                          >
+                              <Banknote className={paymentMethod === 'COD' ? 'text-teal-700' : 'text-slate-400'} />
                               <div className="flex-1">
-                                  <p className="font-bold text-teal-900">Visa ending in 4242</p>
-                                  <p className="text-xs text-teal-700">Expires 12/25</p>
+                                  <p className={`font-bold ${paymentMethod === 'COD' ? 'text-teal-900' : 'text-slate-700'}`}>Cash on Delivery</p>
+                                  <p className="text-xs text-slate-500">Pay with cash when your order arrives</p>
                               </div>
-                              <CheckCircle size={16} className="text-teal-600" />
-                          </div>
-                          <button onClick={() => showToast('Adding new payment methods is coming soon.')} className="w-full py-3 border border-slate-200 rounded-xl text-slate-500 font-bold text-sm hover:bg-slate-50">Add Payment Method</button>
+                              {paymentMethod === 'COD' && <CheckCircle size={16} className="text-teal-600" />}
+                          </button>
+                          <button
+                              onClick={() => { setPaymentMethod('CARD'); showToast('Card payments are coming soon — Cash on Delivery is available now.'); }}
+                              className={`w-full p-3 border-2 rounded-xl flex items-center gap-3 text-left transition-colors opacity-70 ${paymentMethod === 'CARD' ? 'border-slate-300 bg-slate-50' : 'border-slate-200'}`}
+                          >
+                              <CreditCard className="text-slate-400" />
+                              <div className="flex-1">
+                                  <p className="font-bold text-slate-700">Card / Online</p>
+                                  <p className="text-xs text-slate-400">Coming soon</p>
+                              </div>
+                          </button>
                       </div>
                   </div>
               ) : (
@@ -361,13 +487,25 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
           {/* Cart Footer */}
           {cart.length > 0 && checkoutStep !== 'SUCCESS' && (
               <div className="p-6 border-t border-slate-100 bg-slate-50">
-                  <div className="flex justify-between items-center mb-4">
-                      <span className="text-slate-500 font-medium">Subtotal</span>
-                      <span className="text-xl font-black text-slate-800">{formatCurrency(cartTotal)}</span>
+                  <div className="space-y-1.5 mb-4">
+                      <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500 font-medium">Subtotal</span>
+                          <span className="font-bold text-slate-700">{formatCurrency(cartTotal)}</span>
+                      </div>
+                      {checkoutStep === 'CHECKOUT' && (
+                          <div className="flex justify-between items-center text-sm">
+                              <span className="text-slate-500 font-medium">Delivery</span>
+                              <span className="font-bold text-slate-700">{deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}</span>
+                          </div>
+                      )}
+                      <div className="flex justify-between items-center pt-1.5 border-t border-slate-200">
+                          <span className="text-slate-700 font-bold">Total</span>
+                          <span className="text-xl font-black text-slate-800">{formatCurrency(checkoutStep === 'CHECKOUT' ? orderTotal : cartTotal)}</span>
+                      </div>
                   </div>
-                  
+
                   {checkoutStep === 'CART' ? (
-                      <button 
+                      <button
                         onClick={() => setCheckoutStep('CHECKOUT')}
                         className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-2"
                       >
@@ -376,7 +514,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ initialCategory }) => {
                   ) : (
                        <div className="flex gap-3">
                            <button onClick={() => setCheckoutStep('CART')} className="px-6 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-white">Back</button>
-                           <button onClick={handleCheckout} className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 shadow-lg shadow-teal-200">Pay Now</button>
+                           <button onClick={placeOrder} disabled={placing} className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 shadow-lg shadow-teal-200 disabled:opacity-60 flex items-center justify-center gap-2"><Banknote size={18} /> {placing ? 'Placing…' : 'Place Order'}</button>
                        </div>
                   )}
               </div>
