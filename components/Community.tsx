@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { fileToDataUrl } from '../services/image';
 
 // --- SUB-COMPONENT: Create Post Widget ---
-const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void }) => {
+const CreatePostWidget = ({ onPost, avatar }: { onPost: (post: Partial<Post>) => void; avatar: string }) => {
     const [text, setText] = useState('');
     const [postType, setPostType] = useState<PostType>('GENERAL');
     const [isExpanded, setIsExpanded] = useState(false);
@@ -40,7 +40,7 @@ const CreatePostWidget = ({ onPost }: { onPost: (post: Partial<Post>) => void })
     return (
         <div className={`bg-white rounded-2xl shadow-sm border border-slate-200 mb-6 transition-all duration-300 ${isExpanded ? 'p-5 ring-2 ring-teal-50' : 'p-4'}`}>
             <div className="flex gap-4">
-                <img src="https://picsum.photos/id/64/100/100" className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                <img src={avatar} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
                 <div className="flex-1">
                     <textarea 
                         placeholder="What's on your mind?" 
@@ -118,9 +118,10 @@ const FeedPost: React.FC<{
     post: Post;
     onNotify: (message: string) => void;
     currentUserId?: string;
+    currentUserAvatar: string;
     onToggleLike: (post: Post) => void;
     onAddComment: (post: Post, text: string) => void;
-}> = ({ post, onNotify, currentUserId, onToggleLike, onAddComment }) => {
+}> = ({ post, onNotify, currentUserId, currentUserAvatar, onToggleLike, onAddComment }) => {
     // Like/comment state is derived from the persisted post (source of truth),
     // not local state — so it survives refresh.
     const isLiked = !!(currentUserId && post.likedBy?.includes(currentUserId));
@@ -307,7 +308,7 @@ const FeedPost: React.FC<{
 
                     {/* Add comment */}
                     <div className="flex gap-2 items-center pt-1">
-                        <img src="https://picsum.photos/id/64/100/100" className="w-7 h-7 rounded-full object-cover border border-slate-100 flex-shrink-0" />
+                        <img src={currentUserAvatar} className="w-7 h-7 rounded-full object-cover border border-slate-100 flex-shrink-0" />
                         <input
                             type="text"
                             value={commentText}
@@ -1221,7 +1222,7 @@ const Community: React.FC = () => {
                    </div>
                </div>
 
-               <CreatePostWidget onPost={handleNewPost} />
+               <CreatePostWidget onPost={handleNewPost} avatar={user?.avatar || 'https://picsum.photos/id/64/100/100'} />
                
                <div className="space-y-6">
                    {filteredPosts.map(post => (
@@ -1230,6 +1231,7 @@ const Community: React.FC = () => {
                            post={post}
                            onNotify={notify}
                            currentUserId={user?.id}
+                           currentUserAvatar={user?.avatar || 'https://picsum.photos/id/64/100/100'}
                            onToggleLike={handleToggleLike}
                            onAddComment={handleAddComment}
                        />

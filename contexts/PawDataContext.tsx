@@ -158,7 +158,15 @@ export const PawDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         lastActiveRef.current = today;
 
         const profile = profiles[0];
-        if (!profile || !profile.seeded) {
+        // Seed ONLY for a genuinely empty account. We must NOT rely solely on the
+        // profile flag: if that one write was ever lost, re-seeding would clobber the
+        // user's real data (e.g. a just-added pet) with the defaults. As long as ANY
+        // user data exists, treat it as an existing account and load from the API.
+        const isEmptyAccount =
+          profiles.length === 0 && pets.length === 0 && records.length === 0 &&
+          rems.length === 0 && appts.length === 0 && ldgr.length === 0 && bdgs.length === 0;
+
+        if (isEmptyAccount) {
           // First login for this account — seed starter data into the DB.
           const sPets = seedPets(), sRecords = seedRecords(), sReminders = seedReminders();
           const sSlots = seedSlots(), sBadges = seedBadges(), sLedger = seedLedger();
@@ -177,23 +185,28 @@ export const PawDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setPawPoints(meta.pawPoints); setStreak(meta.streak);
           setAppointments([]); setFoundReports([]); setSafety({});
         } else {
+          // Existing account — always load real data from the API.
           setMyPets(pets); setHealthRecords(records); setReminders(rems);
           setFoundReports(found); setSlots(slts); setAppointments(appts);
           setLedger(ldgr); setBadges(bdgs);
-          setPawPoints(profile.pawPoints ?? 0);
+          setPawPoints(profile?.pawPoints ?? 0);
 
           // Daily streak: same day -> unchanged; consecutive day -> +1; gap -> reset to 1.
-          const prevStreak = profile.streak ?? 0;
-          const last = profile.lastActiveDate;
+          const prevStreak = profile?.streak ?? 0;
+          const last = profile?.lastActiveDate;
           let newStreak: number;
           if (last === today) newStreak = Math.max(1, prevStreak);
           else if (last === yesterday) newStreak = prevStreak + 1;
           else newStreak = 1;
           setStreak(newStreak);
 
-          if (last !== today) {
-            pUpdate(C.profile, 'me', {
-              ...profile, id: 'me', seeded: true, streak: newStreak, lastActiveDate: today,
+          // Persist the streak; also self-heals a missing profile so future loads are stable.
+          // pCreate upserts (POST), so it works whether or not the profile row exists.
+          if (!profile || last !== today) {
+            pCreate(C.profile, {
+              id: 'me', seeded: true,
+              pawPoints: profile?.pawPoints ?? 0,
+              streak: newStreak, lastActiveDate: today,
             });
           }
 
@@ -214,7 +227,7 @@ export const PawDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: 'me', pawPoints: points, streak: strk, seeded: true,
       lastActiveDate: lastActiveRef.current || undefined,
     };
-    pUpdate(C.profile, 'me', meta);
+    pCreate(C.profile, meta); // upsert, so it works even if the profile row is missing
   }, []);
 
   const getPetById = useCallback(
