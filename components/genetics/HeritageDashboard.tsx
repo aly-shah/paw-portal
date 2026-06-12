@@ -16,6 +16,15 @@ const HeritageDashboard: React.FC<HeritageDashboardProps> = ({ pets, preSelected
     const [localLineageData, setLocalLineageData] = useState<Record<string, Lineage>>({});
     const [isEditing, setIsEditing] = useState(false);
 
+    // Keep the view in sync when the parent switches the pre-selected pet
+    // (this component is not remounted, so the initial state would otherwise go stale).
+    useEffect(() => {
+        if (preSelectedPetId) {
+            setSelectedPetId(preSelectedPetId);
+            setIsEditing(false);
+        }
+    }, [preSelectedPetId]);
+
     const selectedPet = pets.find(p => p.id === selectedPetId);
     
     // Use local state if available, otherwise fall back to pet prop

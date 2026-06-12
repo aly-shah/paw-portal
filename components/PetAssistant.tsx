@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { generatePetAdvice } from '../services/geminiService';
 import { ChatMessage } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const PetAssistant: React.FC = () => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'model', text: "Hi! I'm PawPal. Ask me anything about your pet's health, training, or nutrition!", timestamp: new Date() }
   ]);
@@ -28,11 +30,18 @@ const PetAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const responseText = await generatePetAdvice(userMsg.text);
+      const ctx = user?.name ? `Pet owner named ${user.name}` : undefined;
+      const responseText = await generatePetAdvice(userMsg.text, ctx);
       const botMsg: ChatMessage = { role: 'model', text: responseText, timestamp: new Date() };
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
       console.error(error);
+      const errMsg: ChatMessage = {
+        role: 'model',
+        text: "Sorry, I couldn't get an answer right now. Please try again in a moment.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -68,8 +77,12 @@ const PetAssistant: React.FC = () => {
             className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div className={`flex max-w-[80%] gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-indigo-500' : 'bg-teal-500'}`}>
-                {msg.role === 'user' ? <User size={16} className="text-white" /> : <Bot size={16} className="text-white" />}
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${msg.role === 'user' ? 'bg-indigo-500' : 'bg-teal-500'}`}>
+                {msg.role === 'user'
+                  ? (user?.avatar
+                      ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                      : <User size={16} className="text-white" />)
+                  : <Bot size={16} className="text-white" />}
               </div>
               <div
                 className={`p-3 rounded-2xl text-sm leading-relaxed shadow-sm ${

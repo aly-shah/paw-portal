@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Calendar, CheckCircle, Mail, ArrowRight, DollarSign, Smartphone, Loader2, Send, Building2, Banknote, Share2, Copy, Plus, X as XIcon, Search } from 'lucide-react';
 import { generateDischargeSummary } from '../../services/geminiService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface TransactionEngineProps {
     patient: any;
@@ -10,6 +11,7 @@ interface TransactionEngineProps {
 }
 
 const TransactionEngine: React.FC<TransactionEngineProps> = ({ patient, visitData, onComplete, inventory = [] }) => {
+    const { user } = useAuth();
     const [step, setStep] = useState<'invoice' | 'payment' | 'summary'>('invoice');
     const [invoiceItems, setInvoiceItems] = useState<any[]>([
         { desc: 'Consultation Fee', price: 1500 },
@@ -221,7 +223,7 @@ const TransactionEngine: React.FC<TransactionEngineProps> = ({ patient, visitDat
                                         <div>
                                             <p className="text-xs font-bold text-slate-400 uppercase">Send Payment To</p>
                                             <p className="font-mono text-lg font-bold text-slate-800">0300 1234567</p>
-                                            <p className="text-xs text-slate-500">Dr. Jane Smith (JazzCash)</p>
+                                            <p className="text-xs text-slate-500">{user?.name || 'Practice Account'} (JazzCash)</p>
                                         </div>
                                         <button onClick={handleCopyNumber} title={copied ? 'Copied!' : 'Copy number'} className={`p-2 bg-white rounded-lg shadow-sm transition-colors ${copied ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-800'}`}>{copied ? <CheckCircle size={18}/> : <Copy size={18}/>}</button>
                                     </div>

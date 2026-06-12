@@ -41,7 +41,6 @@ const PatientManager: React.FC = () => {
   
   // View States
   const [viewingRecord, setViewingRecord] = useState<PatientRecord | null>(null);
-  const [showReport, setShowReport] = useState(false);
   const [historyQuery, setHistoryQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'history' | 'labs' | 'telehealth'>('history');
 
@@ -274,8 +273,8 @@ const PatientManager: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <button 
-                onClick={() => setShowReport(true)}
+            <button
+                onClick={() => { showToast(`Preparing report for ${selectedPatient.name}...`); setTimeout(() => window.print(), 300); }}
                 className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors"
             >
                 <Printer size={16} /> Report
@@ -666,6 +665,59 @@ const PatientManager: React.FC = () => {
                       >
                           <Save size={18} /> Save Record
                       </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Record Detail Modal */}
+      {viewingRecord && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setViewingRecord(null)}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-white rounded-lg border border-slate-200">{getRecordIcon(viewingRecord.type)}</div>
+                          <div>
+                              <h3 className="font-bold text-lg text-slate-800">{viewingRecord.type}</h3>
+                              <p className="text-xs text-slate-500 flex items-center gap-1"><Clock size={12} /> {viewingRecord.date}</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setViewingRecord(null)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full p-2 transition-colors">
+                          <X size={20} />
+                      </button>
+                  </div>
+                  <div className="p-6 overflow-y-auto flex-1 space-y-5">
+                      <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Clinical Notes</p>
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{viewingRecord.notes || 'No notes recorded.'}</p>
+                      </div>
+                      {viewingRecord.treatment && (
+                          <div className="bg-slate-50 border border-slate-100 px-4 py-3 rounded-lg flex items-center gap-2">
+                              <Pill size={16} className="text-blue-500" />
+                              <p className="text-sm font-medium text-slate-700">{viewingRecord.treatment}</p>
+                          </div>
+                      )}
+                      {viewingRecord.followUp && (
+                          <div className="flex items-center gap-2 text-amber-700 text-sm font-bold">
+                              <AlertTriangle size={14} /> Flagged for follow-up
+                          </div>
+                      )}
+                      {viewingRecord.attachments && viewingRecord.attachments.length > 0 && (
+                          <div>
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Attachments</p>
+                              <div className="flex flex-wrap gap-3">
+                                  {viewingRecord.attachments.map((att, i) => (
+                                      <div key={i} className="w-20 h-20 bg-white rounded-xl border border-slate-200 p-1">
+                                          {att.type === 'image' ? (
+                                              <img src={att.url} className="w-full h-full object-cover rounded-lg" />
+                                          ) : (
+                                              <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded-lg"><FileAudio className="text-slate-400" /></div>
+                                          )}
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
                   </div>
               </div>
           </div>

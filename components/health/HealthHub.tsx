@@ -40,6 +40,7 @@ const HealthHub: React.FC = () => {
   );
 
   const makePlan = async () => {
+    if (!pet) return;
     setPlanLoading(true);
     setPlan(null);
     try {
@@ -51,8 +52,8 @@ const HealthHub: React.FC = () => {
   };
 
   const acceptPlan = () => {
-    if (!plan) return;
-    applyCarePlan(petId, plan);
+    if (!plan || !pet) return;
+    applyCarePlan(pet.id, plan);
     toast(`${plan.tasks.length} care tasks added to ${pet.name}'s reminders`, 'success');
     setPlan(null);
   };
@@ -162,9 +163,11 @@ const HealthHub: React.FC = () => {
             {!plan && (
               <>
                 <p className="text-sm text-slate-600 mb-3">
-                  Generate a personalised 12-month preventive plan for {pet.name}.
+                  {pet
+                    ? `Generate a personalised 12-month preventive plan for ${pet.name}.`
+                    : 'Add a pet to generate a personalised 12-month preventive care plan.'}
                 </p>
-                <Button fullWidth onClick={makePlan} loading={planLoading}>
+                <Button fullWidth onClick={makePlan} loading={planLoading} disabled={!pet}>
                   <ClipboardPlus size={18} /> {planLoading ? 'Building plan…' : 'Generate care plan'}
                 </Button>
               </>

@@ -6,6 +6,7 @@ import { MOCK_PRODUCTS } from '../../constants';
 import { Product } from '../../types';
 import { generateProductListing } from '../../services/geminiService';
 import InventoryImportModal from '../inventory/InventoryImportModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 // --- Types for Vendor Module ---
 interface OrderNote {
@@ -394,6 +395,7 @@ const AddProductModal = ({ onClose, onSave }: { onClose: () => void, onSave: (p:
 };
 
 const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PRODUCTS' | 'ORDERS'>('OVERVIEW');
     const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS.map(p => ({ ...p, status: 'Active', sku: `SKU-${Math.floor(Math.random()*1000)}`, costPrice: p.price * 0.7, images: [p.image] })));
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -429,6 +431,13 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
     // Product row action menu
     const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
 
+    // Product inventory search
+    const [productSearch, setProductSearch] = useState('');
+    const filteredProducts = products.filter(p => {
+        const q = productSearch.toLowerCase();
+        return p.name.toLowerCase().includes(q) || (p.sku ?? '').toLowerCase().includes(q);
+    });
+
     const handleDeleteProduct = (id: string) => {
         setProducts(prev => prev.filter(p => p.id !== id));
         setOpenRowMenu(null);
@@ -449,7 +458,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
             id: `p-${Date.now()}`,
             rating: 0,
             reviews: 0,
-            vendor: 'NaturePet Store',
+            vendor: user?.name ?? 'My Store',
             image: newProduct.images && newProduct.images.length > 0 ? newProduct.images[0] : 'https://via.placeholder.com/150'
         };
         setProducts([product, ...products]);
@@ -638,7 +647,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
                     <div className="flex justify-between items-center">
                         <div className="relative w-96">
                             <Search className="absolute left-3 top-2.5 text-slate-400" size={20} />
-                            <input type="text" placeholder="Search inventory..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                            <input type="text" placeholder="Search inventory..." value={productSearch} onChange={e => setProductSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                         </div>
                         <div className="flex gap-2 relative" ref={addMenuRef}>
                             <button 
@@ -684,7 +693,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {products.map((product) => (
+                                {filteredProducts.map((product) => (
                                     <tr key={product.id} className="hover:bg-slate-50 transition-colors group">
                                         <td className="p-4"><img src={product.image} className="w-10 h-10 rounded-lg object-cover bg-slate-100" /></td>
                                         <td className="p-4 font-bold text-slate-800">{product.name}</td>
@@ -731,6 +740,12 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
                                 ))}
                             </tbody>
                         </table>
+                        {filteredProducts.length === 0 && (
+                            <div className="p-12 text-center text-slate-400">
+                                <Package size={48} className="mx-auto mb-4 opacity-20" />
+                                <p>No products found matching your search.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -762,6 +777,14 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-xs font-bold text-slate-400 uppercase border-b border-slate-100">
                                     <tr>
+                                        <th className="p-4 w-10">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-slate-300"
+                                                checked={filteredOrders.length > 0 && filteredOrders.every(o => selectedOrderIds.includes(o.id))}
+                                                onChange={e => setSelectedOrderIds(e.target.checked ? filteredOrders.map(o => o.id) : [])}
+                                            />
+                                        </th>
                                         <th className="p-4">Order ID</th>
                                         <th className="p-4">Customer</th>
                                         <th className="p-4">Status</th>
@@ -772,6 +795,14 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ initialTab }) => {
                                 <tbody className="divide-y divide-slate-100">
                                     {filteredOrders.map(order => (
                                         <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-slate-50 cursor-pointer">
+                                            <td className="p-4" onClick={e => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="rounded border-slate-300"
+                                                    checked={selectedOrderIds.includes(order.id)}
+                                                    onChange={() => setSelectedOrderIds(prev => prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id])}
+                                                />
+                                            </td>
                                             <td className="p-4 font-bold text-slate-800 text-sm">{order.id}</td>
                                             <td className="p-4"><p className="font-bold text-sm text-slate-800">{order.customer.name}</p></td>
                                             <td className="p-4"><span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-bold uppercase">{order.status}</span></td>

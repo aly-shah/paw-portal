@@ -1083,6 +1083,11 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
     const [showAddMenu, setShowAddMenu] = useState(false);
     const addMenuRef = useRef<HTMLDivElement>(null);
 
+    // Per-row action menu for the inventory table. Held at the parent so that
+    // InventoryManagementContent can be invoked as a plain function (avoiding the
+    // input-focus-loss caused by remounting a nested component on every render).
+    const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
+
     // Billing State
     interface BillingSessionData {
         patient: { name: string; owner: string; reason?: string };
@@ -1325,7 +1330,6 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
 
     // --- Sub-Components ---
     const InventoryManagementContent = () => {
-        const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
         const filteredInventory = inventory.filter(item =>
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.sku.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1700,20 +1704,20 @@ const ClinicDashboard: React.FC<ClinicDashboardProps> = ({ initialTab }) => {
                         Back to Operations
                     </button>
                 </div>
-                <InventoryManagementContent />
+                {InventoryManagementContent()}
                 {isInventoryModalOpen && <AddInventoryModal onClose={() => setIsInventoryModalOpen(false)} onSave={handleAddItem} />}
                 {isImportModalOpen && <InventoryImportModal onClose={() => setIsImportModalOpen(false)} onImportComplete={handleImportComplete} />}
-                <ToastNotice />
+                {ToastNotice()}
             </div>
         );
     }
 
     return (
         <div className="flex flex-col h-[calc(100vh-100px)] gap-6 animate-fade-in">
-            <ToastNotice />
-            <RoomActionModal />
-            {isStaffModalOpen && <StaffManagementModal />}
-            {billingSession && <BillingModal />}
+            {ToastNotice()}
+            {RoomActionModal()}
+            {isStaffModalOpen && StaffManagementModal()}
+            {billingSession && BillingModal()}
             
             {viewingPatient && (
                 <PatientProfileModal 

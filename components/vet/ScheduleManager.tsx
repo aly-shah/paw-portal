@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, AlertCircle, X, CheckCircle, Lock, Plus, Search, Filter, MoreHorizontal, MapPin, Phone, Video, Calendar, ChevronDown, UserCheck, List, Activity, DollarSign, Users, ArrowRight } from 'lucide-react';
 import { MOCK_APPOINTMENTS, MOCK_PATIENTS_DETAILED } from '../../constants';
+import { useAuth } from '../../contexts/AuthContext';
 
 // --- Types ---
 interface Appointment {
@@ -28,20 +29,22 @@ const APPOINTMENT_TYPES = [
 const STAFF_FILTERS = ['All Vets', 'Dr. Sarah', 'Dr. Khan', 'Nurse Joy'];
 
 // --- MODAL: Book Appointment ---
-const BookAppointmentModal = ({ 
-    onClose, 
-    onBook, 
-    initialTime, 
-    initialDate, 
+const BookAppointmentModal = ({
+    onClose,
+    onBook,
+    initialTime,
+    initialDate,
     initialPatient,
-    initialNotes = ''
-}: { 
-    onClose: () => void, 
-    onBook: (appt: any) => void, 
-    initialTime?: string, 
-    initialDate: Date, 
+    initialNotes = '',
+    vetName
+}: {
+    onClose: () => void,
+    onBook: (appt: any) => void,
+    initialTime?: string,
+    initialDate: Date,
     initialPatient?: any,
-    initialNotes?: string
+    initialNotes?: string,
+    vetName: string
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPatient, setSelectedPatient] = useState<any>(initialPatient || null);
@@ -66,7 +69,7 @@ const BookAppointmentModal = ({
             type,
             status: 'Confirmed',
             notes,
-            vetName: 'Dr. Sarah' // Default for mock
+            vetName
         });
     };
 
@@ -283,6 +286,8 @@ const AppointmentDetailsModal = ({ appt, onClose, onUpdateStatus, onDelete, onRe
 };
 
 const ScheduleManager: React.FC = () => {
+    const { user } = useAuth();
+    const vetName = user?.name || 'Unassigned';
     const [currentDate, setCurrentDate] = useState(new Date());
     const [appointments, setAppointments] = useState<Appointment[]>(
         MOCK_APPOINTMENTS.map(a => ({
@@ -408,8 +413,9 @@ const ScheduleManager: React.FC = () => {
                     onBook={handleAddAppointment}
                     initialTime={selectedSlot?.time}
                     initialDate={selectedSlot?.date || currentDate}
-                    initialPatient={preSelectedPatient} 
+                    initialPatient={preSelectedPatient}
                     initialNotes={preFilledNotes}
+                    vetName={vetName}
                 />
             )}
 
@@ -430,8 +436,8 @@ const ScheduleManager: React.FC = () => {
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-lg text-slate-800">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
                         <div className="flex gap-1">
-                            <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ChevronLeft size={18}/></button>
-                            <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ChevronRight size={18}/></button>
+                            <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ChevronLeft size={18}/></button>
+                            <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500"><ChevronRight size={18}/></button>
                         </div>
                     </div>
                     

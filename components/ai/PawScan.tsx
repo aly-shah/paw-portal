@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Card, Button, Badge, Avatar, useToast } from '../ui';
 import { usePawData } from '../../contexts/PawDataContext';
 import { scanPetPhoto } from '../../services/geminiService';
+import { fileToDataUrl } from '../../services/image';
 import { PawScanResult } from '../../types';
 
 const urgencyTone: Record<string, { tone: any; label: string; icon: React.ElementType }> = {
@@ -28,21 +29,24 @@ const PawScan: React.FC<PawScanProps> = ({ onBookVet }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PawScanResult | null>(null);
 
-  const handleFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setPreview(dataUrl);
-      const base64 = dataUrl.split(',')[1] || '';
-      setImageData({ base64, mime: file.type });
-      setResult(null);
-    };
-    reader.readAsDataURL(file);
+  const handleFile = async (file: File) => {
+    // Downscale + compress to a persistable JPEG data URL (saved later via
+    // addHealthRecord). The compressed bytes are also what we send to Gemini.
+    const dataUrl = await fileToDataUrl(file);
+    setPreview(dataUrl);
+    const base64 = dataUrl.split(',')[1] || '';
+    const mime = dataUrl.slice(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';')) || 'image/jpeg';
+    setImageData({ base64, mime });
+    setResult(null);
   };
 
   const runScan = async () => {
     if (!imageData) return;
     const pet = myPets.find((p) => p.id === petId) || myPets[0];
+    if (!pet) {
+      toast('Add a pet first to run a scan', 'error');
+      return;
+    }
     setLoading(true);
     setResult(null);
     try {

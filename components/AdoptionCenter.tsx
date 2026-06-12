@@ -2,9 +2,13 @@
 import React, { useState } from 'react';
 import { HeartHandshake, DollarSign, Search, Filter, Plus, Camera, MapPin, CheckCircle, Heart, X, MessageCircle, Info, Tag, Eye } from 'lucide-react';
 import { PetListing, Pet } from '../types';
-import { MOCK_ADOPTION_LISTINGS, MOCK_PETS } from '../constants';
+import { MOCK_ADOPTION_LISTINGS } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
+import { usePawData } from '../contexts/PawDataContext';
 
 const AdoptionCenter: React.FC = () => {
+    const { user } = useAuth();
+    const { myPets } = usePawData();
     const [activeTab, setActiveTab] = useState<'BROWSE' | 'MY_LISTINGS'>('BROWSE');
     const [listings, setListings] = useState<PetListing[]>(MOCK_ADOPTION_LISTINGS);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -45,19 +49,19 @@ const AdoptionCenter: React.FC = () => {
     const handleCreateListing = () => {
         if (!selectedPetForListing || !newListing.title) return;
         
-        const pet = MOCK_PETS.find(p => p.id === selectedPetForListing);
-        
+        const pet = myPets.find(p => p.id === selectedPetForListing);
+
         const created: PetListing = {
             id: `l-${Date.now()}`,
             petId: selectedPetForListing,
             type: newListing.type || 'ADOPTION',
-            price: newListing.type === 'ADOPTION' ? (newListing.price || 0) : (newListing.price || 0),
+            price: newListing.price || 0,
             title: newListing.title || `Rehoming ${pet?.name}`,
             description: newListing.description || '',
             reason: newListing.reason || 'Personal',
             images: newListing.images?.length ? newListing.images : [pet?.image || 'https://via.placeholder.com/150'],
             status: 'AVAILABLE',
-            owner: { id: 'me', name: 'You', avatar: 'https://picsum.photos/id/64/100/100', verified: true, location: 'Karachi' },
+            owner: { id: 'me', name: user?.name || 'You', avatar: user?.avatar || 'https://picsum.photos/id/64/100/100', verified: true, location: 'Karachi' },
             stats: { views: 0, saves: 0 },
             petDetails: pet || {}
         };
@@ -245,7 +249,10 @@ const AdoptionCenter: React.FC = () => {
                              <div>
                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Select Pet</label>
                                  <div className="grid grid-cols-2 gap-3">
-                                     {MOCK_PETS.map(pet => (
+                                     {myPets.length === 0 && (
+                                         <p className="col-span-2 text-xs text-slate-400 text-center py-4">You have no pets yet. Add a pet to create a listing.</p>
+                                     )}
+                                     {myPets.map(pet => (
                                          <div 
                                             key={pet.id}
                                             onClick={() => setSelectedPetForListing(pet.id)}
@@ -288,7 +295,7 @@ const AdoptionCenter: React.FC = () => {
                                     type="number" 
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-teal-500"
                                     placeholder="0"
-                                    onChange={(e) => setNewListing({...newListing, price: parseInt(e.target.value)})}
+                                    onChange={(e) => setNewListing({...newListing, price: parseInt(e.target.value) || 0})}
                                  />
                              </div>
 

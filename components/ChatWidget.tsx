@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Paperclip, Image as ImageIcon, Smile, MoreHorizontal, Phone, Video, Minus, Check, CheckCheck } from 'lucide-react';
+import { fileToDataUrl } from '../services/image';
 
 interface Message {
   id: string;
@@ -102,11 +103,11 @@ const ChatWidget: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const url = URL.createObjectURL(file);
-      
+      const url = await fileToDataUrl(file);
+
       const newMsg: Message = {
         id: Date.now().toString(),
         text: '',
@@ -116,13 +117,21 @@ const ChatWidget: React.FC = () => {
         fileUrl: url,
         status: 'sent'
       };
-      
+
       setMessages(prev => [...prev, newMsg]);
+      // Allow re-uploading the same file (onChange won't fire otherwise).
+      e.target.value = '';
       simulateResponse();
     }
   };
 
   const toggleChat = () => {
+    // If minimized, a click should restore the window (not toggle it closed).
+    if (isOpen && isMinimized) {
+      setIsMinimized(false);
+      setUnreadCount(0);
+      return;
+    }
     setIsOpen(!isOpen);
     if (!isOpen) {
       setUnreadCount(0);

@@ -12,6 +12,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from 'recharts';
 import UserManagement from './UserManagement';
 import GlobalInventory from './GlobalInventory';
+import { useAuth } from '../../contexts/AuthContext';
 
 // --- Types & Interfaces ---
 type AdminTab = 'OVERVIEW' | 'USERS' | 'INVENTORY' | 'INTEGRATIONS' | 'LOGS' | 'SETTINGS';
@@ -233,16 +234,147 @@ const MetricCard = ({ label, value, sub, icon: Icon, color }: any) => (
 );
 
 // --- Integration Editor Component ---
-const IntegrationEditor = ({ integration, onSave, onCancel }: { integration: ApiIntegration | null, onSave: (data: any) => void, onCancel: () => void }) => {
-    // ... (This component remains the same as in the previous step, included here implicitly or via import if split)
-    // For brevity in this response, I'm focusing on the new SystemSettings component below.
-    // Assuming IntegrationEditor logic is preserved or moved to a separate file.
-    // Placeholding minimal version for compilation if needed in single file context:
+const blankIntegration = (): ApiIntegration => ({
+    id: '', name: '', provider: '', type: 'EMAIL', status: 'INACTIVE',
+    credentials: { apiKey: '' },
+    endpoints: { baseUrl: '' },
+    logic: { triggers: [], method: 'POST', timeoutMs: 5000, retryCount: 0, headers: [] },
+    health: { uptime: 100, successRate: 100, lastTest: 'Never', latency: 0, recentErrors: 0 },
+    logs: [],
+    description: '',
+});
+
+const IntegrationEditor = ({ integration, onSave, onCancel }: { integration: ApiIntegration | null, onSave: (data: ApiIntegration) => void, onCancel: () => void }) => {
+    const [form, setForm] = useState<ApiIntegration>(integration ?? blankIntegration());
+    const [activeTab, setActiveTab] = useState<'CONFIG' | 'LOGS'>('CONFIG');
+
+    const update = (key: keyof ApiIntegration, value: any) => setForm(prev => ({ ...prev, [key]: value }));
+
+    const toggleTrigger = (t: TriggerEvent) => {
+        setForm(prev => ({
+            ...prev,
+            logic: {
+                ...prev.logic,
+                triggers: prev.logic.triggers.includes(t)
+                    ? prev.logic.triggers.filter(x => x !== t)
+                    : [...prev.logic.triggers, t],
+            },
+        }));
+    };
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div className="bg-white p-8 rounded-xl"><p>Integration Editor Placeholder</p><button onClick={onCancel}>Close</button></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div>
+                        <h3 className="font-black text-xl text-slate-800">{integration ? 'Manage Integration' : 'Add Integration'}</h3>
+                        <p className="text-xs text-slate-500">Configure provider, triggers and connection.</p>
+                    </div>
+                    <button onClick={onCancel} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors"><X size={20} /></button>
+                </div>
+
+                <div className="flex border-b border-slate-100 px-6 gap-6">
+                    {(['CONFIG', 'LOGS'] as const).map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === tab ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            {tab === 'LOGS' ? `Logs (${form.logs.length})` : 'Configuration'}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                    {activeTab === 'CONFIG' && (
+                        <>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Name</label>
+                                    <input type="text" value={form.name} onChange={e => update('name', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900" placeholder="Transactional Email" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Provider</label>
+                                    <input type="text" value={form.provider} onChange={e => update('provider', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900" placeholder="SendGrid" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Type</label>
+                                    <select value={form.type} onChange={e => update('type', e.target.value as IntegrationType)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900">
+                                        {(['EMAIL', 'SMS', 'PUSH', 'OTP', 'PAYMENT', 'CUSTOM'] as IntegrationType[]).map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Status</label>
+                                    <select value={form.status} onChange={e => update('status', e.target.value as ApiIntegration['status'])} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900">
+                                        {(['ACTIVE', 'INACTIVE', 'ERROR'] as const).map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Base URL</label>
+                                <input type="text" value={form.endpoints.baseUrl} onChange={e => setForm(prev => ({ ...prev, endpoints: { ...prev.endpoints, baseUrl: e.target.value } }))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900 font-mono text-sm" placeholder="https://api.provider.com" />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Description</label>
+                                <textarea value={form.description} onChange={e => update('description', e.target.value)} rows={2} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900 text-sm resize-none" placeholder="What this integration does..." />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Trigger Events</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {TRIGGERS_LIST.map(t => (
+                                        <button
+                                            key={t}
+                                            onClick={() => toggleTrigger(t)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${form.logic.triggers.includes(t) ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {activeTab === 'LOGS' && (
+                        <div className="space-y-3">
+                            {form.logs.length === 0 && (
+                                <div className="py-12 text-center text-slate-400">
+                                    <FileText size={40} className="mx-auto mb-3 opacity-20" />
+                                    <p className="text-sm font-medium">No logs recorded for this integration yet.</p>
+                                </div>
+                            )}
+                            {form.logs.map(log => (
+                                <div key={log.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-2 h-2 rounded-full ${log.status === 'SUCCESS' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-700">{log.event}</p>
+                                            <p className="text-[10px] text-slate-400">{log.timestamp} • {log.message}</p>
+                                        </div>
+                                    </div>
+                                    <span className="font-mono text-xs font-bold text-slate-500">{log.code} • {log.latency}ms</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
+                    <button onClick={onCancel} className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100">Cancel</button>
+                    <button
+                        onClick={() => onSave(form)}
+                        disabled={!form.name || !form.provider}
+                        className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        <Save size={18} /> Save Integration
+                    </button>
+                </div>
+            </div>
         </div>
-    ); 
+    );
 };
 
 // --- System Settings Component ---
@@ -647,7 +779,7 @@ const SystemSettings = () => {
                             { id: 'notifications', label: 'Notifications', icon: Bell },
                             { id: 'branding', label: 'Branding', icon: Palette },
                             { id: 'logs', label: 'Maintenance & Logs', icon: Archive },
-                        ].map(item => (
+                        ].filter(item => item.label.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
                             <button
                                 key={item.id}
                                 onClick={() => setActiveCategory(item.id as any)}
@@ -677,6 +809,15 @@ const SystemSettings = () => {
 };
 
 const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onLogout }) => {
+    const { user } = useAuth();
+    const adminName = user?.name ?? 'Super Admin';
+    const adminInitials = (user?.name ?? 'Super Admin')
+        .split(' ')
+        .map(part => part[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'SA';
     const [activeTab, setActiveTab] = useState<AdminTab>('OVERVIEW');
     const [integrations, setIntegrations] = useState<ApiIntegration[]>(INTEGRATIONS_MOCK);
     const [editingIntegration, setEditingIntegration] = useState<ApiIntegration | null>(null);
@@ -965,11 +1106,15 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onLogout }) =
                     <div className="flex items-center gap-4">
                         <div className="text-right hidden md:block">
                             <p className="text-xs font-bold text-slate-400 uppercase">Logged in as</p>
-                            <p className="text-sm font-bold text-slate-800">Super Admin</p>
+                            <p className="text-sm font-bold text-slate-800">{adminName}</p>
                         </div>
-                        <div className="w-10 h-10 bg-slate-900 rounded-full flex items-center justify-center text-white font-bold border-2 border-slate-200">
-                            SA
-                        </div>
+                        {user?.avatar ? (
+                            <img src={user.avatar} alt={adminName} className="w-10 h-10 rounded-full object-cover border-2 border-slate-200" />
+                        ) : (
+                            <div className="w-10 h-10 bg-slate-900 rounded-full flex items-center justify-center text-white font-bold border-2 border-slate-200">
+                                {adminInitials}
+                            </div>
+                        )}
                     </div>
                 </header>
 
