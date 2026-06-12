@@ -29,6 +29,7 @@ PORT=7070
 API_NAME="pawportal-api"
 API_PORT=7071
 DOMAIN="paw.scalamatic.com"
+OLD_DOMAIN="paw.scalamedic.com"   # decommissioned — removed on deploy so only DOMAIN serves
 CERTBOT_EMAIL="hhhawkin989898@gmail.com"
 
 # Directory this script lives in (the repo root)
@@ -185,6 +186,12 @@ $SUDO ln -sfn "$NGINX_AVAIL" "$NGINX_ENABLED"
 # Drop the default site if it's still enabled (it can shadow our server_name)
 [[ -e /etc/nginx/sites-enabled/default ]] && $SUDO rm -f /etc/nginx/sites-enabled/default || true
 
+# Decommission the old domain so the site ONLY serves $DOMAIN.
+if [[ -n "${OLD_DOMAIN:-}" && "$OLD_DOMAIN" != "$DOMAIN" ]]; then
+  log "Removing old nginx site for $OLD_DOMAIN ..."
+  $SUDO rm -f "/etc/nginx/sites-enabled/$OLD_DOMAIN" "/etc/nginx/sites-available/$OLD_DOMAIN" || true
+fi
+
 log "Testing & reloading nginx..."
 $SUDO nginx -t
 $SUDO systemctl reload nginx
@@ -208,6 +215,13 @@ $SUDO certbot --nginx \
   --redirect \
   -m "$CERTBOT_EMAIL" \
   || warn "certbot failed (likely DNS/firewall not ready). Site still serves over HTTP. Re-run after fixing."
+
+# Delete the old domain's certificate now that nothing references it.
+if [[ -n "${OLD_DOMAIN:-}" && "$OLD_DOMAIN" != "$DOMAIN" ]] \
+   && $SUDO certbot certificates 2>/dev/null | grep -q "Certificate Name: $OLD_DOMAIN"; then
+  log "Deleting old SSL certificate for $OLD_DOMAIN ..."
+  $SUDO certbot delete --cert-name "$OLD_DOMAIN" --non-interactive || true
+fi
 
 $SUDO systemctl reload nginx || true
 
