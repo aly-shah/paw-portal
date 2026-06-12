@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MOCK_SERVICES, MOCK_PETS } from '../constants';
 import { ServiceType, ServiceProvider, Pet, MatchInsight, AvailabilitySlot } from '../types';
 import { MapPin, Star, CheckCircle, Phone, Clock, Search, Filter, X, Calendar, ChevronRight, Map, List, Stethoscope, Building2, Scissors, User, Siren, AlertTriangle, Plus, Minus, Navigation, Share2, MessageCircle, Shield, Tag, Briefcase, Check, Sparkles, BrainCircuit, Copy, Coins, Lock, Unlock } from 'lucide-react';
 import { FindCareSection } from './FindCare';
 import { generateProviderQuestions } from '../services/geminiService';
+import { api } from '../services/api';
 import { usePawData } from '../contexts/PawDataContext';
 
 interface ServiceFinderProps {
@@ -345,7 +346,27 @@ const ServiceFinder: React.FC<ServiceFinderProps> = ({ initialFilter, onNavigate
       }
   }, [initialFilter]);
 
-  const filteredServices = MOCK_SERVICES.filter(s => {
+  // Real provider listings published by signed-up vets/clinics/walkers.
+  const [liveProviders, setLiveProviders] = useState<ServiceProvider[]>([]);
+  useEffect(() => {
+      let cancelled = false;
+      api.list<ServiceProvider>('global', 'providers')
+          .then(list => { if (!cancelled) setLiveProviders(list); })
+          .catch(() => { /* fall back to mock-only */ });
+      return () => { cancelled = true; };
+  }, []);
+
+  // Real, visible providers first; then the demo providers. De-duped by id.
+  const allProviders = useMemo(() => {
+      const map = new Map<string, ServiceProvider>();
+      liveProviders
+          .filter(p => p.available !== false && Array.isArray(p.services) && p.services.length > 0)
+          .forEach(p => map.set(p.id, p));
+      MOCK_SERVICES.forEach(p => { if (!map.has(p.id)) map.set(p.id, p); });
+      return Array.from(map.values());
+  }, [liveProviders]);
+
+  const filteredServices = allProviders.filter(s => {
     const matchesCategory = activeCategory === 'ALL' || s.type === activeCategory;
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           s.location.toLowerCase().includes(searchTerm.toLowerCase()) ||

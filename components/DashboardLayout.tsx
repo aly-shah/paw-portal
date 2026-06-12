@@ -27,7 +27,8 @@ import {
   CalendarCheck,
   Camera,
   ShieldAlert,
-  Gift
+  Gift,
+  Store
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { MOCK_PATIENTS_DETAILED } from '../constants';
@@ -53,6 +54,7 @@ import BookingCenter from './booking/BookingCenter';
 import SafetyCenter from './safety/SafetyCenter';
 import RewardsCenter from './rewards/RewardsCenter';
 import PawScan from './ai/PawScan';
+import ServiceListingEditor from './ServiceListingEditor';
 
 // Define Tabs
 export enum Tab {
@@ -74,7 +76,8 @@ export enum Tab {
   APPOINTMENTS = 'Appointments',
   PAWSCAN = 'PawScan',
   SAFETY = 'Safety',
-  REWARDS = 'Paw Points'
+  REWARDS = 'Paw Points',
+  LISTING = 'My Listing'
 }
 
 interface DashboardLayoutProps {
@@ -134,7 +137,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
     if (userRole === UserRole.VET || userRole === UserRole.CLINIC) {
         const items = [
             ...common,
-            { id: Tab.JOBS, icon: Briefcase, label: 'Find Jobs' }, 
+            { id: Tab.LISTING, icon: Store, label: 'My Listing' },
+            { id: Tab.JOBS, icon: Briefcase, label: 'Find Jobs' },
             { id: Tab.PATIENTS, icon: ClipboardList, label: 'Patient Directory' },
             { id: Tab.SCHEDULE, icon: Calendar, label: 'Schedule' },
             { id: Tab.ANALYTICS, icon: Activity, label: 'Analytics' },
@@ -158,6 +162,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
     if (userRole === UserRole.CARE_GIVER) {
         return [
             ...common,
+            { id: Tab.LISTING, icon: Store, label: 'My Listing' },
             { id: Tab.JOBS, icon: Briefcase, label: 'Find Jobs' },
             { id: Tab.SCHEDULE, icon: Calendar, label: 'My Schedule' },
             { id: Tab.REVIEWS, icon: Star, label: 'My Reviews' },
@@ -193,6 +198,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ onLogout, userRole })
     if (activeTab === Tab.APPOINTMENTS) return <BookingCenter />;
     if (activeTab === Tab.SAFETY) return <SafetyCenter />;
     if (activeTab === Tab.REWARDS) return <RewardsCenter />;
+    if (activeTab === Tab.LISTING) return <ServiceListingEditor />;
     if (activeTab === Tab.PATIENTS) return <PatientManager />;
     
     if (activeTab === Tab.INVENTORY && userRole === UserRole.CLINIC) {
