@@ -28,7 +28,7 @@ APP_NAME="pawportal"
 PORT=7070
 API_NAME="pawportal-api"
 API_PORT=7071
-DOMAIN="paw.scalamedic.com"
+DOMAIN="paw.scalamatic.com"
 CERTBOT_EMAIL="hhhawkin989898@gmail.com"
 
 # Directory this script lives in (the repo root)
